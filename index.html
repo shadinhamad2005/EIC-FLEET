@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Company Fleet Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jsPDF & AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif;
+            background-color: #020617; /* slate-950 */
+            color: #f8fafc; /* slate-50 */
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(14, 165, 233, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
+        }
+        
+        h1, h2, h3, .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+
+        /* Sleek scrollbar - neon blue */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(2, 6, 23, 0.5); }
+        ::-webkit-scrollbar-thumb { background: #0ea5e9; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
+
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(15px) scale(0.98); filter: blur(4px); } 
+            to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 
+        }
+
+        .slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6); /* slate-900 */
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(56, 189, 248, 0.1); /* sky-400 */
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .neon-border {
+            box-shadow: 0 0 10px rgba(14, 165, 233, 0.3), inset 0 0 10px rgba(14, 165, 233, 0.1);
+            border: 1px solid rgba(14, 165, 233, 0.4);
+        }
+        
+        .neon-border-green {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.3), inset 0 0 10px rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .neon-text {
+            text-shadow: 0 0 8px rgba(14, 165, 233, 0.6);
+        }
+
+        /* Input hiding arrows */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .btn-modern { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+        .btn-modern:active { transform: scale(0.95); }
+
+        .success-anim { animation: successScale 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes successScale {
+            0% { transform: scale(0.5); opacity: 0; filter: blur(10px); }
+            100% { transform: scale(1); opacity: 1; filter: blur(0); }
+        }
+
+        /* Isometric / Holographic card effect */
+        .holo-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            transform-style: preserve-3d;
+        }
+        .holo-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 20px 40px -10px rgba(14, 165, 233, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+            border-color: rgba(14, 165, 233, 0.3);
+        }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden selection:bg-sky-500/30 selection:text-sky-200 min-h-screen flex flex-col relative">
+    
+    <!-- Ambient glowing orbs behind everything -->
+    <div class="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-sky-900/20 blur-[120px] pointer-events-none -z-10"></div>
+    <div class="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-900/20 blur-[120px] pointer-events-none -z-10"></div>
+
+    <div id="app" class="flex-1 w-full max-w-5xl mx-auto flex flex-col items-center">
+        <!-- Persistent View Containers to avoid flashing full innerHTML -->
+        <div id="view-loader" class="w-full min-h-screen flex items-center justify-center">
+            <i class="fas fa-circle-notch fa-spin text-4xl text-sky-400"></i>
+        </div>
+        <div id="view-login" class="w-full hidden justify-center items-center min-h-screen"></div>
+        <div id="view-vehicles" class="w-full hidden justify-start flex-col"></div>
+        <div id="view-active-trip" class="w-full hidden justify-start flex-col"></div>
+        <div id="view-admin" class="w-full hidden justify-start flex-col"></div>
+    </div>
+
+    <!-- Start Trip Modal -->
+    <div id="start-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-panel border-sky-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] transform scale-95 transition-transform duration-300 holo-card bg-slate-900" id="start-modal-content">
+            <div class="p-5 border-b border-sky-500/20 flex justify-between items-center bg-slate-950/60">
+                <h3 class="font-bold text-lg text-white font-rajdhani uppercase tracking-widest neon-text">Link Initialization</h3>
+                <button onclick="window.closeModal('start-modal', 'start-modal-content')" class="text-sky-500/50 hover:text-sky-400 transition-colors"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div id="start-form" class="p-6 bg-slate-900/40 relative">
+                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none"></div>
+                <p id="start-modal-text" class="text-xs text-sky-200/70 mb-6 font-mono uppercase tracking-[0.2em] relative z-10"></p>
+                
+                <div class="mb-6 relative z-10">
+                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Directive / Purpose</label>
+                    <input type="text" id="purpose-input" placeholder="e.g., SECTOR PATROL" class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50">
+                </div>
+                
+                <div class="flex justify-center mt-10 mb-4 relative z-10">
+                    <!-- Futuristic 3D Push Button -->
+                    <button id="start-btn" onclick="window.confirmStartDriving()" class="relative w-36 h-36 rounded-full bg-slate-900 border border-sky-500/20 shadow-[0_15px_35px_rgba(0,0,0,0.5),inset_0_-5px_15px_rgba(0,0,0,0.4),inset_0_5px_15px_rgba(56,189,248,0.2)] flex flex-col items-center justify-center transition-all duration-200 hover:shadow-[0_20px_40px_rgba(16,185,129,0.2)] active:transform active:scale-95 active:shadow-[0_5px_10px_rgba(0,0,0,0.5)] group outline-none focus:ring-4 focus:ring-emerald-500/30">
+                        <div class="absolute inset-4 rounded-full border border-sky-500/30 bg-gradient-to-b from-slate-800 to-slate-900 shadow-[inset_0_-2px_10px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center pointer-events-none group-active:from-slate-900 transition-colors">
+                            <i class="fas fa-power-off text-emerald-500 text-3xl mb-1 group-hover:text-emerald-400 group-active:text-emerald-600 transition-colors drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]"></i>
+                            <span class="text-xl font-bold font-rajdhani tracking-[0.2em] text-emerald-500 group-hover:text-emerald-400 transition-colors group-active:text-emerald-600 drop-shadow-[0_0_5px_rgba(16,185,129,0.5)]">START</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <div id="start-success" class="hidden p-8 flex-col items-center justify-center h-[300px] bg-slate-900/40 relative">
+                <!-- Abstract holographic car start animation -->
+                <div class="relative w-32 h-32 flex items-center justify-center mb-6">
+                    <div class="absolute inset-0 border-[3px] border-emerald-500/50 rounded-full animate-[ping_1.5s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
+                    <div class="absolute inset-2 border border-emerald-400/30 rounded-full animate-[spin_4s_linear_infinite]"></div>
+                    <div class="absolute inset-4 border border-emerald-400/20 rounded-full animate-[spin_3s_linear_infinite_reverse]"></div>
+                    <i class="fas fa-space-shuttle text-emerald-400 text-5xl transform -rotate-45 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] success-anim"></i>
+                </div>
+                <h3 class="text-xl font-bold text-emerald-400 font-rajdhani tracking-widest uppercase neon-text">Link Established</h3>
+                <p class="text-xs font-mono text-emerald-200/50 mt-2 uppercase tracking-[0.2em]">Telemetry Active</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stop Trip Modal -->
+    <div id="stop-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-panel border-indigo-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(99,102,241,0.2)] transform scale-95 transition-transform duration-300 holo-card bg-slate-900" id="stop-modal-content">
+            <div class="p-5 border-b border-indigo-500/20 flex justify-between items-center bg-slate-950/60">
+                <h3 class="font-bold text-lg text-white font-rajdhani uppercase tracking-widest neon-text">Secure Unit</h3>
+                <button onclick="window.closeModal('stop-modal', 'stop-modal-content')" class="text-indigo-500/50 hover:text-indigo-400 transition-colors"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="stop-form" class="p-6 bg-slate-900/40 relative">
+                <div class="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-transparent pointer-events-none"></div>
+                <p class="text-xs text-indigo-200/70 mb-6 font-mono uppercase tracking-[0.2em] relative z-10" id="stop-modal-text">Finalize End Odometer to Disengage.</p>
+                
+                <div class="mb-6 relative z-10">
+                    <label class="block text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-2 font-mono">Current Odometer (KM)</label>
+                    <input type="number" id="ending-km-input" placeholder="e.g., 45120" class="w-full p-4 bg-slate-950 border border-indigo-500/30 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 focus:outline-none text-indigo-100 transition-all font-mono text-xl tracking-[0.2em] shadow-inner placeholder-indigo-900/50 text-center">
+                </div>
+
+                <div class="flex justify-center mt-8 mb-2 relative z-10">
+                    <!-- Futuristic 3D Stop Button -->
+                    <button id="stop-btn" onclick="window.confirmStopDriving()" class="relative w-36 h-36 rounded-full bg-slate-900 border border-indigo-500/20 shadow-[0_15px_35px_rgba(0,0,0,0.5),inset_0_-5px_15px_rgba(0,0,0,0.4),inset_0_5px_15px_rgba(244,63,94,0.1)] flex flex-col items-center justify-center transition-all duration-200 hover:shadow-[0_20px_40px_rgba(244,63,94,0.2)] active:transform active:scale-95 active:shadow-[0_5px_10px_rgba(0,0,0,0.5)] group outline-none focus:ring-4 focus:ring-rose-500/30">
+                        <div class="absolute inset-4 rounded-full border border-indigo-500/30 bg-gradient-to-b from-slate-800 to-slate-900 shadow-[inset_0_-2px_10px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center pointer-events-none group-active:from-slate-900 transition-colors">
+                            <i class="fas fa-satellite-dish text-rose-500 text-2xl mb-2 group-hover:text-rose-400 group-active:text-rose-600 transition-colors drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]"></i>
+                            <span class="text-xl font-bold font-rajdhani tracking-[0.2em] text-rose-500 group-hover:text-rose-400 transition-colors group-active:text-rose-600 drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]">STOP</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+            <div id="stop-success" class="hidden p-8 flex-col items-center justify-center h-[300px] bg-slate-900/40 relative">
+                <div class="relative w-32 h-32 flex items-center justify-center mb-6">
+                    <div class="absolute inset-0 border-2 border-dashed border-indigo-500/50 rounded-full animate-[spin_6s_linear_infinite]"></div>
+                    <div class="absolute inset-4 border border-indigo-400/30 rounded-full"></div>
+                    <i class="fas fa-lock text-indigo-400 text-5xl drop-shadow-[0_0_15px_rgba(99,102,241,0.8)] success-anim"></i>
+                </div>
+                <h3 class="text-xl font-bold text-indigo-400 font-rajdhani tracking-widest uppercase neon-text">Unit Secured</h3>
+                <p class="text-xs font-mono text-indigo-200/50 mt-2 uppercase tracking-[0.2em]">Link Terminated</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Vehicle Modal -->
+    <div id="add-vehicle-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-panel border-sky-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] transform scale-95 transition-transform duration-300 holo-card bg-slate-900" id="add-vehicle-content">
+            <div class="p-5 border-b border-sky-500/20 flex justify-between items-center bg-slate-950/60">
+                <h3 id="vehicle-modal-title" class="font-bold text-lg text-white font-rajdhani uppercase tracking-widest neon-text">Unit Editor</h3>
+                <button onclick="window.closeModal('add-vehicle-modal', 'add-vehicle-content')" class="text-sky-500/50 hover:text-sky-400 transition-colors"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6 space-y-5 bg-slate-900/40 relative">
+                <div class="absolute inset-0 bg-gradient-to-br from-sky-500/5 to-transparent pointer-events-none"></div>
+                <div class="relative z-10">
+                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Make & Model</label>
+                    <input type="text" id="new-vehicle-make" placeholder="e.g., TOYOTA CAMRY" class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50 uppercase">
+                </div>
+                <div class="relative z-10">
+                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Callsign / Plate</label>
+                    <input type="text" id="new-vehicle-plate" placeholder="e.g., XJ-982" class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50 uppercase">
+                </div>
+                <div class="relative z-10">
+                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Image URL (Optional)</label>
+                    <input type="text" id="new-vehicle-photo" placeholder="https://..." class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50">
+                </div>
+                <button onclick="window.submitVehicle()" class="btn-modern w-full bg-slate-900 hover:bg-slate-800 text-sky-400 hover:text-sky-300 py-4 rounded-xl font-bold neon-border transition-all font-rajdhani text-lg tracking-widest uppercase mt-4 relative z-10">Commit Unit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Driver Modal -->
+    <div id="add-driver-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-panel border-sky-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] transform scale-95 transition-transform duration-300 holo-card bg-slate-900" id="add-driver-content">
+            <div class="p-5 border-b border-sky-500/20 flex justify-between items-center bg-slate-950/60">
+                <h3 id="driver-modal-title" class="font-bold text-lg text-white font-rajdhani uppercase tracking-widest neon-text">Pilot Editor</h3>
+                <button onclick="window.closeModal('add-driver-modal', 'add-driver-content')" class="text-sky-500/50 hover:text-sky-400 transition-colors"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6 space-y-5 bg-slate-900/40 relative">
+                <div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent pointer-events-none"></div>
+                <div class="relative z-10">
+                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Pilot Designation</label>
+                    <input type="text" id="new-driver-name" placeholder="e.g., J. DOE" class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50 uppercase">
+                </div>
+                <div class="relative z-10">
+                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Auth Token (4-PIN)</label>
+                    <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="new-driver-pin" placeholder="••••" class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono tracking-[1em] text-center text-xl font-bold shadow-inner placeholder-sky-900/50">
+                    <p class="text-[9px] text-sky-500/50 mt-2 hidden font-mono uppercase tracking-widest" id="edit-pin-hint">Leave blank to retain current auth</p>
+                </div>
+                <div class="relative z-10">
+                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Image URL (Optional)</label>
+                    <input type="text" id="new-driver-photo" placeholder="https://..." class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50">
+                </div>
+                <button onclick="window.submitDriver()" class="btn-modern w-full bg-slate-900 hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 py-4 rounded-xl font-bold border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)] transition-all font-rajdhani text-lg tracking-widest uppercase mt-4 relative z-10">Commit Pilot</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3.5 rounded-full shadow-lg text-sm font-medium transition-all duration-300 opacity-0 -translate-y-4 z-[100] flex items-center justify-center pointer-events-none min-w-[280px]"></div>
+
+    <!-- Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCSVE4DJIKMx4OkBi_TJct2E9HB_GYpbhM",
+            authDomain: "eic-fleet.firebaseapp.com",
+            projectId: "eic-fleet",
+            storageBucket: "eic-fleet.firebasestorage.app",
+            messagingSenderId: "375768338401",
+            appId: "1:375768338401:web:62c355a298ec80ad240ca0"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const APP_ID = "eic-fleet";
+        const getCol = (name) => collection(db, 'artifacts', APP_ID, 'public', 'data', name);
+        const getDocRef = (colName, docId) => doc(db, 'artifacts', APP_ID, 'public', 'data', colName, docId);
+
+        const ADMIN_PIN = '9999';
+
+        let state = {
+            view: 'login', // 'login', 'vehicles', 'admin', 'active_trip'
+            adminTab: 'logbook',
+            currentUser: null,
+            drivers: [],
+            vehicles: [],
+            logs: [],
+            selectedVehicle: null,
+            editingVehicleId: null,
+            editingDriverId: null,
+            isLoading: true
+        };
+
+        let loaded = { drivers: false, vehicles: false, logs: false };
+
+        async function init() {
+            try {
+                await signInAnonymously(auth);
+                setupRealtimeListeners();
+            } catch (error) {
+                console.error("Firebase Auth Error:", error);
+                state.isLoading = false;
+                document.getElementById('app').innerHTML = `
+                    <div class="flex items-center justify-center min-h-screen">
+                        <div class="glass-panel bg-white p-8 rounded-2xl max-w-sm text-center">
+                            <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-4"></i>
+                            <h2 class="text-lg font-bold text-slate-800 mb-2">Connection Error</h2>
+                            <p class="text-sm text-slate-500">Unable to authenticate to the database. Please try again later.</p>
+                        </div>
+                    </div>`;
+            }
+        }
+
+        function formatDate(isoString) {
+            if (!isoString) return '-';
+            const date = new Date(isoString);
+            return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function setupRealtimeListeners() {
+            onSnapshot(getCol('drivers'), (snapshot) => {
+                state.drivers = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                checkLoaded('drivers');
+            });
+            onSnapshot(getCol('vehicles'), (snapshot) => {
+                state.vehicles = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                // Sort visually: Available first
+                state.vehicles.sort((a,b) => a.status === 'Available' ? -1 : 1);
+                checkLoaded('vehicles');
+                
+                // If we are logged in and our vehicle updates (e.g., someone forces takeover), re-evaluate
+                if (state.currentUser && state.view === 'active_trip') {
+                    const myActive = state.vehicles.find(v => v.status === 'In Use' && v.currentDriverId === state.currentUser.id);
+                    if (!myActive) handleAutoBypass(); // We lost the vehicle
+                }
+            });
+            onSnapshot(getCol('logs'), (snapshot) => {
+                let fetchedLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                // Sort by newest start time
+                fetchedLogs.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+                state.logs = fetchedLogs;
+                checkLoaded('logs');
+            });
+        }
+
+        function checkLoaded(type) {
+            loaded[type] = true;
+            if (loaded.drivers && loaded.vehicles && loaded.logs) {
+                state.isLoading = false;
+                if(state.currentUser) handleAutoBypass();
+                else render();
+            }
+        }
+
+        function handleAutoBypass() {
+            if (!state.currentUser || state.view === 'admin') return render();
+            
+            const myActive = state.vehicles.find(v => v.status === 'In Use' && v.currentDriverId === state.currentUser.id);
+            if (myActive) {
+                state.view = 'active_trip';
+                state.selectedVehicle = myActive;
+            } else {
+                state.view = 'vehicles';
+                state.selectedVehicle = null;
+            }
+            render();
+        }
+
+        function updateDOM(id, html) {
+            const el = document.getElementById(id);
+            if(el && el.innerHTML !== html) {
+                el.innerHTML = html;
+            }
+        }
+
+        function showView(viewId) {
+            ['view-loader', 'view-login', 'view-vehicles', 'view-active-trip', 'view-admin'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(viewId).classList.remove('hidden');
+            // Login view already has items-center justify-center in HTML
+        }
+
+        function render() {
+            if (state.isLoading) {
+                showView('view-loader');
+                return;
+            }
+
+            if (state.view === 'login') {
+                updateDOM('view-login', renderLogin());
+                showView('view-login');
+            } else if (state.view === 'vehicles') {
+                updateDOM('view-vehicles', renderVehicles());
+                showView('view-vehicles');
+            } else if (state.view === 'active_trip') {
+                updateDOM('view-active-trip', renderActiveTrip());
+                showView('view-active-trip');
+            } else if (state.view === 'admin') {
+                updateDOM('view-admin', renderAdmin());
+                showView('view-admin');
+            }
+        }
+
+        function renderLogin() {
+            return `
+            <div class="w-full max-w-sm px-6 fade-in flex flex-col items-center">
+                <div class="glass-panel w-full rounded-3xl p-8 flex flex-col items-center relative overflow-hidden group holo-card">
+                    <div class="absolute inset-0 bg-gradient-to-br from-sky-500/10 to-indigo-500/10 opacity-50 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    
+                    <div class="w-20 h-20 rounded-2xl bg-slate-900 border border-sky-500/30 text-sky-400 flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(14,165,233,0.2)] relative z-10 transform rotate-45 group-hover:rotate-180 transition-transform duration-700">
+                        <i class="fas fa-shield-alt text-3xl -rotate-45 group-hover:-rotate-180 transition-transform duration-700"></i>
+                    </div>
+                    
+                    <h1 class="text-3xl font-rajdhani font-bold text-white mb-2 tracking-wider neon-text relative z-10 uppercase">Fleet Core</h1>
+                    <p class="text-sky-200/60 text-xs mb-8 text-center font-bold font-mono uppercase tracking-[0.2em] relative z-10">Auth Required</p>
+
+                    <div class="w-full space-y-5 relative z-10">
+                        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="login-pin" placeholder="••••" class="w-full p-4 bg-slate-950/80 border border-sky-500/30 rounded-2xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 text-sky-100 transition-all font-mono tracking-[1em] text-center text-3xl font-bold shadow-inner placeholder-sky-900/50">
+                        
+                        <button onclick="window.handleLoginSubmit()" class="btn-modern w-full bg-slate-900 hover:bg-slate-800 text-sky-400 hover:text-sky-300 py-4 rounded-xl font-bold neon-border transition-all font-rajdhani text-xl tracking-widest uppercase">
+                            Initialize
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        }
+        
+        function renderActiveTrip() {
+            const v = state.selectedVehicle;
+            if(!v) return '';
+
+            const photoHtml = v.photo 
+                ? `<img src="${v.photo}" class="w-full h-56 object-cover opacity-80 mix-blend-luminosity hover:mix-blend-normal transition-all duration-500" onerror="this.src=''; this.className='hidden'; this.nextElementSibling.classList.remove('hidden');"> <div class="w-full h-56 flex items-center justify-center bg-slate-900/50 hidden"><i class="fas fa-space-shuttle text-5xl text-sky-500/30"></i></div>` 
+                : `<div class="w-full h-56 flex items-center justify-center bg-slate-900/50"><i class="fas fa-space-shuttle text-5xl text-sky-500/30"></i></div>`;
+
+            return `
+            <div class="w-full max-w-md mx-auto fade-in pb-12 pt-8 px-4">
+                <div class="glass-panel rounded-3xl overflow-hidden holo-card flex flex-col">
+                    <div class="p-4 flex items-center justify-between border-b border-sky-500/20 bg-slate-900/40">
+                        <div class="flex items-center gap-3">
+                            ${state.currentUser.photo ? `<img src="${state.currentUser.photo}" class="w-10 h-10 rounded-full object-cover border border-sky-400/50 shadow-[0_0_10px_rgba(14,165,233,0.3)]">` : `<div class="w-10 h-10 rounded-full bg-slate-800 border border-sky-500/30 text-sky-400 flex items-center justify-center font-bold text-sm shadow-[0_0_10px_rgba(14,165,233,0.3)]">${state.currentUser.name.charAt(0)}</div>`}
+                            <div>
+                                <h2 class="text-sm font-bold text-sky-100 font-rajdhani tracking-wider uppercase">${state.currentUser.name}</h2>
+                                <p class="text-[10px] text-emerald-400 font-mono font-bold uppercase tracking-widest flex items-center gap-2"><span class="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span> Unit Active</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="relative bg-slate-950 top-0 overflow-hidden group">
+                        ${photoHtml}
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent flex items-end p-5">
+                            <div class="text-white relative z-10">
+                                <h1 class="text-3xl font-rajdhani font-bold leading-tight neon-text uppercase tracking-wider">${v.makeModel}</h1>
+                                <p class="text-xs font-mono tracking-[0.2em] text-sky-400 mt-1">${v.plate}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 bg-slate-900/40 space-y-5">
+                        <div class="bg-indigo-900/20 border border-indigo-500/30 rounded-xl p-4 flex items-start gap-4 shadow-inner">
+                            <i class="fas fa-satellite-dish text-indigo-400 mt-0.5 animate-pulse"></i>
+                            <p class="text-xs text-indigo-200/80 font-mono uppercase tracking-widest leading-relaxed">Telemetry Link Established. Awaiting manual shutdown sequence to disengage unit.</p>
+                        </div>
+                        <button onclick="window.openStopModal('${v.id}')" class="btn-modern w-full bg-slate-900 text-emerald-400 py-4 rounded-xl font-bold neon-border-green shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all text-xl font-rajdhani tracking-widest uppercase flex justify-center items-center gap-3">
+                            <i class="fas fa-power-off"></i> Disengage
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderVehicles() {
+            if (!state.currentUser) return '';
+
+            let vehicleCards = state.vehicles.map(vehicle => {
+                const isTaken = vehicle.status === 'In Use';
+                const driverData = isTaken ? state.drivers.find(d => d.id === vehicle.currentDriverId) : null;
+                const dName = driverData ? driverData.name : 'Unknown';
+
+                const photoHtml = vehicle.photo 
+                    ? `<img src="${vehicle.photo}" class="w-full h-48 object-cover mix-blend-luminosity opacity-70 group-hover:mix-blend-normal group-hover:opacity-100 transition-all duration-500" onerror="this.src=''; this.className='hidden'; this.nextElementSibling.classList.remove('hidden');"> <div class="w-full h-48 flex items-center justify-center bg-slate-900/50 hidden"><i class="fas fa-space-shuttle text-4xl text-sky-500/30"></i></div>` 
+                    : `<div class="w-full h-48 flex items-center justify-center bg-slate-900/50"><i class="fas fa-space-shuttle text-4xl text-sky-500/30"></i></div>`;
+
+                let statusBadge, actionBtn;
+                if (isTaken) {
+                    statusBadge = `<span class="bg-indigo-900/80 text-indigo-300 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 backdrop-blur-md shadow-[0_0_10px_rgba(99,102,241,0.3)] border border-indigo-500/30 uppercase tracking-widest"><i class="fas fa-user-lock text-[10px]"></i> ${dName}</span>`;
+                    actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-3 bg-slate-900/80 text-indigo-400 font-bold rounded-xl hover:bg-slate-800 transition-colors btn-modern text-sm border border-indigo-500/30 shadow-[0_0_10px_rgba(99,102,241,0.2)] uppercase tracking-widest font-rajdhani">Override Link</button>`;
+                } else {
+                    statusBadge = `<span class="bg-emerald-900/80 text-emerald-300 px-3 py-1.5 rounded-lg text-[10px] font-bold backdrop-blur-md shadow-[0_0_10px_rgba(16,185,129,0.3)] border border-emerald-500/30 uppercase tracking-widest flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> Ready</span>`;
+                    actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-3 bg-gradient-to-r from-sky-600 to-indigo-600 text-white font-bold rounded-xl hover:shadow-[0_0_20px_rgba(14,165,233,0.5)] transition-all btn-modern shadow-[0_0_10px_rgba(14,165,233,0.3)] uppercase tracking-widest font-rajdhani border border-sky-400/50 text-lg">Establish Link</button>`;
+                }
+
+                return `
+                <div class="glass-panel rounded-3xl overflow-hidden fade-in flex flex-col group holo-card">
+                    <div class="relative bg-slate-950 overflow-hidden">
+                        ${photoHtml}
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
+                        <div class="absolute top-4 right-4">${statusBadge}</div>
+                        <div class="absolute bottom-4 left-5 right-5">
+                            <h3 class="font-bold text-white text-2xl font-rajdhani uppercase tracking-wider drop-shadow-[0_0_8px_rgba(14,165,233,0.5)]">${vehicle.makeModel}</h3>
+                            <p class="text-sky-300 text-xs font-bold tracking-[0.2em] font-mono mt-0.5">${vehicle.plate}</p>
+                        </div>
+                    </div>
+                    <div class="p-5 flex-1 flex items-end bg-slate-900/30 border-t border-sky-500/20">
+                        ${actionBtn}
+                    </div>
+                </div>`;
+            }).join('');
+
+            if (state.vehicles.length === 0) {
+                vehicleCards = `<div class="col-span-full py-16 text-center text-sky-500/50 bg-slate-900/30 border border-dashed border-sky-500/30 rounded-3xl font-mono uppercase tracking-widest text-sm">NO UNITS DETECTED IN SECTOR</div>`;
+            }
+
+            return `
+            <div class="w-full fade-in pb-12">
+                <header class="py-5 px-6 sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-sky-500/20 flex justify-between items-center mb-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+                    <div class="flex items-center gap-4">
+                        ${state.currentUser.photo ? `<img src="${state.currentUser.photo}" class="w-12 h-12 rounded-full object-cover border-2 border-sky-500/50 shadow-[0_0_15px_rgba(14,165,233,0.4)]">` : `<div class="w-12 h-12 rounded-full bg-slate-800 text-sky-400 border-2 border-sky-500/50 flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(14,165,233,0.4)] font-rajdhani">${state.currentUser.name.charAt(0)}</div>`}
+                        <div>
+                            <p class="text-[10px] text-sky-500 font-mono font-bold uppercase tracking-[0.2em]">Pilot Recognized</p>
+                            <h1 class="text-lg font-bold text-white font-rajdhani uppercase tracking-wider neon-text">${state.currentUser.name}</h1>
+                        </div>
+                    </div>
+                    <button onclick="window.logout()" class="w-12 h-12 rounded-full bg-slate-900 text-sky-500 hover:bg-slate-800 hover:text-sky-300 border border-sky-500/30 transition-all shadow-[0_0_10px_rgba(14,165,233,0.2)] flex items-center justify-center btn-modern hover:shadow-[0_0_20px_rgba(14,165,233,0.5)]">
+                        <i class="fas fa-power-off"></i>
+                    </button>
+                </header>
+                
+                <h2 class="text-3xl font-bold mb-6 px-6 text-white font-rajdhani tracking-widest uppercase neon-text">Available Units</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 px-6">
+                    ${vehicleCards}
+                </div>
+            </div>`;
+        }
+
+        function renderAdmin() {
+            const tabs = [
+                { id: 'logbook', label: 'Telemetry Logs' },
+                { id: 'vehicles', label: 'Unit Management' },
+                { id: 'drivers', label: 'Pilot Management' }
+            ].map(tab => `
+                <button onclick="window.setAdminTab('${tab.id}')" class="px-5 py-4 text-sm font-bold transition-all font-rajdhani uppercase tracking-widest ${state.adminTab === tab.id ? 'text-sky-400 border-b-2 border-sky-400 bg-sky-900/20' : 'text-slate-500 hover:text-sky-300 hover:bg-slate-900/50 border-b-2 border-transparent'}">
+                    ${tab.label}
+                </button>
+            `).join('');
+
+            let contentHtml = '';
+
+            if (state.adminTab === 'logbook') {
+                const rows = state.logs.map(log => {
+                    const vehicle = state.vehicles.find(v => v.id === log.vehicleId);
+                    const driver = state.drivers.find(d => d.id === log.driverId);
+                    const vName = vehicle ? vehicle.makeModel : 'Unknown';
+                    const dName = driver ? driver.name : 'Unknown';
+                    
+                    const statusDot = log.status === 'Active' ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]' : log.status === 'Auto-Closed' ? 'bg-amber-500' : 'bg-slate-600';
+                    const statusText = log.status === 'Active' ? 'text-emerald-400' : 'text-slate-500';
+
+                    return `
+                    <tr class="border-b border-sky-500/10 hover:bg-sky-900/10 transition-colors text-sm text-slate-300">
+                        <td class="py-4 pl-5"><div class="flex items-center gap-3"><div class="w-2h h-2 rounded-full ${statusDot}"></div> <span class="uppercase tracking-widest text-[10px] font-bold ${statusText}">${log.status}</span></div></td>
+                        <td class="py-4 px-3 font-semibold text-sky-100 font-rajdhani tracking-wider uppercase">${vName}</td>
+                        <td class="py-4 px-3 font-medium text-slate-300 uppercase font-rajdhani">${dName}</td>
+                        <td class="py-4 px-3 text-slate-400 truncate max-w-[150px] font-mono text-xs" title="${log.purpose}">${log.purpose || '-'}</td>
+                        <td class="py-4 px-3 text-sky-300 font-mono text-xs">${log.endingKm ? log.endingKm + ' km' : '-'}</td>
+                        <td class="py-4 px-3 text-slate-500 whitespace-nowrap font-mono text-xs">${formatDate(log.startTime)}</td>
+                        <td class="py-4 pr-5 text-slate-500 whitespace-nowrap font-mono text-xs">${formatDate(log.endTime)}</td>
+                    </tr>`;
+                }).join('');
+
+                contentHtml = `
+                <div class="slide-up">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <h2 class="text-xl font-bold text-white tracking-widest font-rajdhani uppercase neon-text">Telemetry Logbook</h2>
+                        <div class="flex gap-3">
+                            <button onclick="window.exportCSV()" class="bg-slate-900 hover:bg-slate-800 border border-sky-500/30 text-sky-400 px-4 py-2 rounded-xl text-sm font-bold shadow-[0_0_10px_rgba(14,165,233,0.2)] transition-colors btn-modern font-rajdhani tracking-widest uppercase"><i class="fas fa-file-csv mr-2"></i>CSV DB</button>
+                            <button onclick="window.exportPDF()" class="bg-slate-900 hover:bg-slate-800 border border-indigo-500/30 text-indigo-400 px-4 py-2 rounded-xl text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] transition-colors btn-modern font-rajdhani tracking-widest uppercase"><i class="fas fa-file-pdf mr-2"></i>PDF DUMP</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto border border-sky-500/20 rounded-2xl bg-slate-900/40 shadow-inner">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-950/80 text-sky-500 text-[10px] font-mono font-bold uppercase tracking-[0.2em] border-b border-sky-500/30">
+                                <tr>
+                                    <th class="py-4 pl-5">Status</th>
+                                    <th class="py-4 px-3">Unit</th>
+                                    <th class="py-4 px-3">Pilot</th>
+                                    <th class="py-4 px-3">Directive</th>
+                                    <th class="py-4 px-3">End Odometer</th>
+                                    <th class="py-4 px-3">Launch Time</th>
+                                    <th class="py-4 pr-5">Arrival Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows.length > 0 ? rows : `<tr><td colspan="7" class="text-center py-12 text-slate-500 font-mono uppercase tracking-[0.2em] text-xs">NO TELEMETRY LOGS FOUND</td></tr>`}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>`;
+            } else if (state.adminTab === 'vehicles') {
+                const vList = state.vehicles.map(v => `
+                    <div class="glass-panel border border-sky-500/20 flex gap-4 rounded-2xl p-4 items-center hover:shadow-[0_0_15px_rgba(14,165,233,0.3)] hover:border-sky-400/50 transition-all group holo-card bg-slate-900/40">
+                        <div class="w-16 h-16 rounded-xl bg-slate-950 border border-sky-500/20 flex-shrink-0 relative overflow-hidden">
+                             ${v.photo ? `<img src="${v.photo}" class="w-full h-full object-cover mix-blend-luminosity opacity-80 group-hover:mix-blend-normal group-hover:opacity-100 transition-all">` : `<i class="fas fa-space-shuttle absolute inset-0 m-auto text-sky-500/30 text-2xl w-max h-max"></i>`}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-bold text-white truncate text-lg leading-tight font-rajdhani uppercase tracking-wider">${v.makeModel}</h3>
+                            <p class="text-[10px] text-sky-400 font-mono font-bold mt-1 tracking-widest">${v.plate}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="window.editVehicle('${v.id}')" class="w-9 h-9 rounded-full bg-slate-800 border border-sky-500/30 text-sky-400 hover:bg-sky-900/50 hover:text-sky-300 flex items-center justify-center transition-colors shadow-[0_0_10px_rgba(14,165,233,0.2)]">
+                                <i class="fas fa-edit text-sm"></i>
+                            </button>
+                            <button onclick="window.deleteVehicle('${v.id}')" class="w-9 h-9 rounded-full bg-slate-800 border border-red-500/30 text-red-400 hover:bg-red-900/30 hover:text-red-300 flex items-center justify-center transition-colors shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                contentHtml = `
+                <div class="slide-up">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-white tracking-widest font-rajdhani uppercase neon-text">Unit Database</h2>
+                        <button onclick="window.openModal('add-vehicle-modal', 'add-vehicle-content')" class="bg-gradient-to-r from-sky-600 to-indigo-600 hover:shadow-[0_0_15px_rgba(14,165,233,0.5)] border border-sky-400/50 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all btn-modern font-rajdhani tracking-widest uppercase"><i class="fas fa-plus mr-2"></i>ADD NEW UNIT</button>
+                    </div>
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        ${vList}
+                    </div>
+                </div>`;
+            } else if (state.adminTab === 'drivers') {
+                const dList = state.drivers.map(d => `
+                    <div class="glass-panel border border-sky-500/20 flex gap-4 rounded-2xl p-4 items-center hover:shadow-[0_0_15px_rgba(14,165,233,0.3)] hover:border-sky-400/50 transition-all group holo-card bg-slate-900/40">
+                        <div class="w-14 h-14 rounded-full bg-slate-950 border border-sky-500/20 flex-shrink-0 relative overflow-hidden shadow-[0_0_10px_rgba(14,165,233,0.2)]">
+                            ${d.photo ? `<img src="${d.photo}" class="w-full h-full object-cover">` : `<i class="fas fa-user-astronaut absolute inset-0 m-auto text-sky-500/30 text-xl w-max h-max"></i>`}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-bold text-white truncate text-lg leading-tight font-rajdhani uppercase tracking-wider">${d.name}</h3>
+                            <p class="text-[10px] text-sky-400/80 font-mono font-bold mt-1.5 tracking-widest bg-slate-950/80 inline-block px-2 py-0.5 rounded border border-sky-500/20 shadow-inner">AUTH: ****</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="window.editDriver('${d.id}')" class="w-9 h-9 rounded-full bg-slate-800 border border-sky-500/30 text-sky-400 hover:bg-sky-900/50 flex items-center justify-center transition-colors shadow-[0_0_10px_rgba(14,165,233,0.2)]">
+                                <i class="fas fa-edit text-sm"></i>
+                            </button>
+                            <button onclick="window.deleteDriver('${d.id}')" class="w-9 h-9 rounded-full bg-slate-800 border border-red-500/30 text-red-400 hover:bg-red-900/30 flex items-center justify-center transition-colors shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                                <i class="fas fa-trash text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                contentHtml = `
+                <div class="slide-up">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-white tracking-widest font-rajdhani uppercase neon-text">Pilot Database</h2>
+                        <button onclick="window.openModal('add-driver-modal', 'add-driver-content')" class="bg-gradient-to-r from-sky-600 to-indigo-600 hover:shadow-[0_0_15px_rgba(14,165,233,0.5)] border border-sky-400/50 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all btn-modern font-rajdhani tracking-widest uppercase"><i class="fas fa-plus mr-2"></i>ADD NEW PILOT</button>
+                    </div>
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        ${dList}
+                    </div>
+                </div>`;
+            }
+
+            return `
+            <div class="w-full fade-in pb-12 flex flex-col h-full bg-transparent">
+                <header class="py-5 px-6 bg-slate-950/90 backdrop-blur-xl border-b border-sky-500/30 flex justify-between items-center sticky top-0 z-40 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-slate-900 border border-sky-500/50 text-sky-400 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(14,165,233,0.3)]">
+                            <i class="fas fa-network-wired"></i>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-sky-500 uppercase font-mono font-bold tracking-[0.2em]">Oversight Status: Active</p>
+                            <h1 class="font-bold text-white text-xl tracking-widest uppercase leading-tight font-rajdhani neon-text">Command Center</h1>
+                        </div>
+                    </div>
+                    <button onclick="window.logout()" class="w-12 h-12 rounded-full bg-slate-900 border border-sky-500/30 hover:border-sky-400/50 text-sky-500 hover:text-sky-300 transition-colors shadow-[0_0_10px_rgba(14,165,233,0.2)] flex items-center justify-center btn-modern group">
+                        <i class="fas fa-power-off group-hover:drop-shadow-[0_0_5px_rgba(14,165,233,0.8)]"></i>
+                    </button>
+                </header>
+                
+                <div class="flex border-b border-sky-500/20 sticky top-[89px] z-30 bg-slate-950/80 backdrop-blur-xl px-4 overflow-x-auto no-scrollbar mb-8 shadow-sm">
+                    ${tabs}
+                </div>
+                
+                <div class="px-6 flex-1">
+                    ${contentHtml}
+                </div>
+            </div>`;
+        }
+
+        // --- Action Handlers ---
+        window.handleLoginSubmit = () => {
+            const input = document.getElementById('login-pin');
+            const pin = input.value.trim();
+            
+            if (pin.length !== 4) {
+                window.showToast("Please enter a 4-digit PIN", true);
+                return;
+            }
+
+            if (pin === ADMIN_PIN) {
+                state.view = 'admin';
+                input.value = '';
+                render();
+            } else {
+                const driver = state.drivers.find(d => String(d.pin) === pin);
+                if (driver) {
+                    state.currentUser = driver;
+                    input.value = '';
+                    handleAutoBypass();
+                } else {
+                    window.showToast("Invalid PIN", true);
+                    input.value = '';
+                    input.focus();
+                }
+            }
+        };
+
+        // Listen for Enter key on login
+        document.addEventListener('keydown', (e) => {
+            if(state.view === 'login' && e.key === 'Enter') {
+                window.handleLoginSubmit();
+            }
+        });
+
+
+        // Modals & Toast
+        window.openModal = (modalId, contentId) => {
+            const m = document.getElementById(modalId);
+            const c = document.getElementById(contentId);
+            if(!m || !c) return;
+            m.classList.remove('hidden');
+            setTimeout(() => {
+                m.classList.remove('opacity-0');
+                c.classList.remove('scale-95');
+            }, 10);
+        };
+
+        window.closeModal = (modalId, contentId) => {
+            const m = document.getElementById(modalId);
+            const c = document.getElementById(contentId);
+            if(!m || !c) return;
+            m.classList.add('opacity-0');
+            c.classList.add('scale-95');
+            setTimeout(() => m.classList.add('hidden'), 300);
+        };
+
+        window.showToast = (msg, isError = false) => {
+            const t = document.getElementById('toast');
+            if(!t) return;
+            t.textContent = msg;
+            t.className = `fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3.5 rounded-full shadow-lg text-sm font-medium transition-all duration-300 z-[100] flex items-center justify-center pointer-events-none min-w-[280px] ${isError ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'}`;
+            setTimeout(() => t.classList.remove('-translate-y-4', 'opacity-0'), 10);
+            setTimeout(() => {
+                t.classList.add('-translate-y-4', 'opacity-0');
+            }, 3000);
+        };
+
+        // --- Trip Actions ---
+        window.openStartModal = (vid) => {
+            state.selectedVehicle = state.vehicles.find(v => v.id === vid);
+            if(!state.selectedVehicle) return;
+            window.openModal('start-modal', 'start-modal-content');
+        };
+
+        window.confirmStartDriving = async () => {
+            const v = state.selectedVehicle;
+            const purpose = document.getElementById('purpose-input').value.trim();
+            if(!v) return;
+            if(!purpose) { window.showToast('Please enter a purpose', true); return; }
+
+            try {
+                // Quick optimistic UI update
+                document.getElementById('start-form').classList.add('hidden');
+                document.getElementById('start-success').classList.remove('hidden');
+                document.getElementById('start-success').classList.add('flex');
+                
+                await updateDoc(getDocRef('vehicles', v.id), {
+                    status: 'In Use',
+                    currentDriverId: state.currentUser.id
+                });
+                
+                await addDoc(getCol('logs'), {
+                    vehicleId: v.id,
+                    driverId: state.currentUser.id,
+                    startTime: new Date().toISOString(),
+                    endTime: null,
+                    status: 'Active',
+                    purpose: purpose,
+                    endingKm: null
+                });
+                
+                setTimeout(() => {
+                    window.closeModal('start-modal', 'start-modal-content');
+                    setTimeout(() => {
+                        document.getElementById('start-form').classList.remove('hidden');
+                        document.getElementById('start-success').classList.add('hidden');
+                        document.getElementById('start-success').classList.remove('flex');
+                        document.getElementById('purpose-input').value = '';
+                    }, 300);
+                }, 1500);
+
+            } catch(e) {
+                console.error(e);
+                window.showToast('Error starting trip', true);
+            }
+        };
+
+        window.openStopModal = (vid) => {
+            window.openModal('stop-modal', 'stop-modal-content');
+        };
+
+        window.confirmStopDriving = async () => {
+            const v = state.selectedVehicle;
+            const km = document.getElementById('ending-km-input').value.trim();
+            if(!v) return;
+            if(!km) { window.showToast('Please enter Ending KM', true); return; }
+
+            try {
+                document.getElementById('stop-form').classList.add('hidden');
+                document.getElementById('stop-success').classList.remove('hidden');
+                document.getElementById('stop-success').classList.add('flex');
+
+                await updateDoc(getDocRef('vehicles', v.id), {
+                    status: 'Available',
+                    currentDriverId: null
+                });
+                
+                const activeLog = state.logs.find(l => l.vehicleId === v.id && l.status === 'Active');
+                if(activeLog) {
+                    await updateDoc(getDocRef('logs', activeLog.id), {
+                        status: 'Closed',
+                        endTime: new Date().toISOString(),
+                        endingKm: km
+                    });
+                }
+
+                setTimeout(() => {
+                    window.closeModal('stop-modal', 'stop-modal-content');
+                    setTimeout(() => {
+                        document.getElementById('stop-form').classList.remove('hidden');
+                        document.getElementById('stop-success').classList.add('hidden');
+                        document.getElementById('stop-success').classList.remove('flex');
+                        document.getElementById('ending-km-input').value = '';
+                        state.selectedVehicle = null;
+                        handleAutoBypass();
+                    }, 300);
+                }, 1500);
+
+            } catch(e) {
+                console.error(e);
+                window.showToast('Error securing vehicle', true);
+            }
+        };
+
+        window.logout = () => {
+            state.currentUser = null;
+            state.selectedVehicle = null;
+            state.view = 'login';
+            render();
+        };
+
+        window.setAdminTab = (tab) => {
+            state.adminTab = tab;
+            render();
+        };
+
+        // --- Admin CRUD Actions ---
+        window.openAddVehicle = () => {
+            state.editingVehicleId = null;
+            document.getElementById('vehicle-modal-title').textContent = 'Add Vehicle';
+            document.getElementById('new-vehicle-make').value = '';
+            document.getElementById('new-vehicle-plate').value = '';
+            document.getElementById('new-vehicle-photo').value = '';
+            window.openModal('add-vehicle-modal', 'add-vehicle-content');
+        };
+
+        window.editVehicle = (id) => {
+            const v = state.vehicles.find(v => v.id === id);
+            if(!v) return;
+            state.editingVehicleId = id;
+            document.getElementById('vehicle-modal-title').textContent = 'Edit Vehicle';
+            document.getElementById('new-vehicle-make').value = v.makeModel || '';
+            document.getElementById('new-vehicle-plate').value = v.plate || '';
+            document.getElementById('new-vehicle-photo').value = v.photo || '';
+            window.openModal('add-vehicle-modal', 'add-vehicle-content');
+        };
+
+        window.submitVehicle = async () => {
+            const make = document.getElementById('new-vehicle-make').value.trim();
+            const plate = document.getElementById('new-vehicle-plate').value.trim();
+            const photo = document.getElementById('new-vehicle-photo').value.trim();
+            if(!make || !plate) { window.showToast('Make/Model and Plate are required', true); return; }
+
+            try {
+                if (state.editingVehicleId) {
+                    await updateDoc(getDocRef('vehicles', state.editingVehicleId), {
+                        makeModel: make, plate: plate, photo: photo
+                    });
+                    window.showToast('Vehicle updated successfully');
+                } else {
+                    await addDoc(getCol('vehicles'), {
+                        makeModel: make, plate: plate, photo: photo,
+                        status: 'Available', currentDriverId: null
+                    });
+                    window.showToast('Vehicle added successfully');
+                }
+                window.closeModal('add-vehicle-modal', 'add-vehicle-content');
+            } catch(e) {
+                console.error(e);
+                window.showToast('Error saving vehicle', true);
+            }
+        };
+
+        window.deleteVehicle = async (id) => {
+            if(!confirm('Are you sure you want to delete this vehicle?')) return;
+            try {
+                await deleteDoc(getDocRef('vehicles', id));
+                window.showToast('Vehicle deleted');
+            } catch(e) {
+                console.error(e);
+                window.showToast('Error deleting vehicle', true);
+            }
+        };
+
+        window.openAddDriver = () => {
+            state.editingDriverId = null;
+            document.getElementById('driver-modal-title').textContent = 'Add Driver';
+            document.getElementById('edit-pin-hint').classList.add('hidden');
+            document.getElementById('new-driver-name').value = '';
+            document.getElementById('new-driver-pin').value = '';
+            document.getElementById('new-driver-photo').value = '';
+            window.openModal('add-driver-modal', 'add-driver-content');
+        };
+
+        window.editDriver = (id) => {
+            const d = state.drivers.find(d => d.id === id);
+            if(!d) return;
+            state.editingDriverId = id;
+            document.getElementById('driver-modal-title').textContent = 'Edit Driver';
+            document.getElementById('edit-pin-hint').classList.remove('hidden');
+            document.getElementById('new-driver-name').value = d.name || '';
+            document.getElementById('new-driver-pin').value = ''; // Don't show existing PIN
+            document.getElementById('new-driver-photo').value = d.photo || '';
+            window.openModal('add-driver-modal', 'add-driver-content');
+        };
+
+        window.submitDriver = async () => {
+            const name = document.getElementById('new-driver-name').value.trim();
+            const pin = document.getElementById('new-driver-pin').value.trim();
+            const photo = document.getElementById('new-driver-photo').value.trim();
+            
+            if(!name) { window.showToast('Name is required', true); return; }
+            if(!state.editingDriverId && pin.length !== 4) { window.showToast('4-digit PIN is required', true); return; }
+            if(state.editingDriverId && pin.length > 0 && pin.length !== 4) { window.showToast('PIN must be 4 digits', true); return; }
+
+            try {
+                if (state.editingDriverId) {
+                    const updates = { name: name, photo: photo };
+                    if (pin.length === 4) updates.pin = pin;
+                    await updateDoc(getDocRef('drivers', state.editingDriverId), updates);
+                    window.showToast('Driver updated successfully');
+                } else {
+                    await addDoc(getCol('drivers'), {
+                        name: name, pin: pin, photo: photo
+                    });
+                    window.showToast('Driver added successfully');
+                }
+                window.closeModal('add-driver-modal', 'add-driver-content');
+            } catch(e) {
+                console.error(e);
+                window.showToast('Error saving driver', true);
+            }
+        };
+
+        window.deleteDriver = async (id) => {
+            if(!confirm('Are you sure you want to delete this driver?')) return;
+            try {
+                await deleteDoc(getDocRef('drivers', id));
+                window.showToast('Driver deleted');
+            } catch(e) {
+                console.error(e);
+                window.showToast('Error deleting driver', true);
+            }
+        };
+
+        // Export (TBD with proper library or existing methods if wanted)
+        window.exportCSV = () => {
+            const headers = ['Status', 'Vehicle', 'Driver', 'Purpose', 'Ending KM', 'Taken Date', 'Return Date'];
+            const rows = state.logs.map(log => {
+                const v = state.vehicles.find(v => v.id === log.vehicleId);
+                const d = state.drivers.find(d => d.id === log.driverId);
+                return [
+                    log.status,
+                    v ? v.makeModel : 'Unknown',
+                    d ? d.name : 'Unknown',
+                    log.purpose ? log.purpose.replace(/,/g, '') : '', // sanitize commas
+                    log.endingKm || '',
+                    new Date(log.startTime).toLocaleString(),
+                    log.endTime ? new Date(log.endTime).toLocaleString() : ''
+                ].join(',');
+            });
+            const csvData = [headers.join(','), ...rows].join('\n');
+            const blob = new Blob([csvData], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'fleet_logs.csv');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        };
+
+        window.exportPDF = () => {
+            if (typeof window.jspdf === 'undefined') return window.showToast('PDF library not loaded', true);
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.setFontSize(18);
+            doc.text('Company Fleet Tracker - Logbook', 14, 22);
+            doc.setFontSize(11);
+            doc.setTextColor(100);
+            doc.text('Generated: ' + new Date().toLocaleString(), 14, 30);
+            
+            const rows = state.logs.map(log => {
+                const v = state.vehicles.find(v => v.id === log.vehicleId);
+                const d = state.drivers.find(d => d.id === log.driverId);
+                return [
+                    log.status,
+                    v ? v.makeModel : 'Unknown',
+                    d ? d.name : 'Unknown',
+                    log.endingKm ? log.endingKm + ' km' : '-',
+                    new Date(log.startTime).toLocaleDateString(),
+                    log.endTime ? new Date(log.endTime).toLocaleDateString() : '-'
+                ];
+            });
+
+            doc.autoTable({
+                startY: 40,
+                head: [['Status', 'Vehicle', 'Driver', 'End KM', 'Taken Date', 'Return Date']],
+                body: rows,
+                theme: 'grid',
+                headStyles: { fillColor: [59, 130, 246] },
+                styles: { fontSize: 9 }
+            });
+            
+            doc.save('fleet_logs.pdf');
+        };
+
+        init();
+    </script>
+</body>
+</html>
