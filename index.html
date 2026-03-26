@@ -48,10 +48,11 @@
 
         input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 
-        .btn-modern { transition: all 0.2s ease; }
+        .btn-modern { transition: all 0.2s ease; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; }
         .btn-modern:active { transform: scale(0.97); }
+        .touch-action-none { touch-action: none; }
 
-        .drive-off { animation: driveOff 1.5s cubic-bezier(0.5, 0, 0.2, 1) forwards; }
+        .drive-off { animation: driveOff 0.8s cubic-bezier(0.5, 0, 0.2, 1) forwards; will-change: transform, opacity; }
         @keyframes driveOff {
             0% { transform: translateX(-150px); opacity: 0; }
             20% { opacity: 1; transform: translateX(0); }
@@ -59,7 +60,7 @@
             100% { transform: translateX(800px) scale(1.1); opacity: 0; filter: blur(4px); }
         }
 
-        .drive-park { animation: drivePark 1.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+        .drive-park { animation: drivePark 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; will-change: transform, opacity; }
         @keyframes drivePark {
             0% { transform: translateX(-800px) scale(1.1); opacity: 0; filter: blur(8px); }
             60% { transform: translateX(40px) scale(1); opacity: 1; filter: blur(0); }
@@ -182,6 +183,26 @@
         @keyframes tabEnter {
             from { opacity: 0; transform: scale(0.98) translateY(5px); }
             to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+ 
+        /* Mobile Performance Optimizations */
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 24px); }
+        .tap-highlight-none { -webkit-tap-highlight-color: transparent; }
+        
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+        }
+        @keyframes skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        @media (max-width: 640px) {
+            .mobile-card-stack { grid-template-columns: 1fr !important; gap: 1rem !important; }
+            .mobile-header { padding: 1rem !important; }
+            .mobile-btn-text { font-size: 14px !important; }
         }
 
     </style>
@@ -571,12 +592,24 @@
                 }
  
                 // Markers & Bounds
-                L.circleMarker([route[0].lat, route[0].lng], { radius: 6, fillColor: "#10b981", color: "#fff", weight: 2, opacity: 1, fillOpacity: 1 }).addTo(activeMap).bindPopup("Start");
-                const last = route[route.length - 1];
-                L.circleMarker([last.lat, last.lng], { radius: 6, fillColor: "#ef4444", color: "#fff", weight: 2, opacity: 1, fillOpacity: 1 }).addTo(activeMap).bindPopup("End");
- 
                 const allPoints = route.map(p => [p.lat, p.lng]);
-                activeMap.fitBounds(L.polyline(allPoints).getBounds(), { padding: [40, 40] });
+                const isStationary = route.length <= 1 || route.every(p => p.lat === route[0].lat && p.lng === route[0].lng);
+ 
+                // Draw Markers
+                L.circleMarker([route[0].lat, route[0].lng], { radius: 6, fillColor: "#10b981", color: "#fff", weight: 2, opacity: 1, fillOpacity: 1 }).addTo(activeMap).bindPopup("Start Location");
+                const last = route[route.length - 1];
+                L.circleMarker([last.lat, last.lng], { radius: 6, fillColor: "#ef4444", color: "#fff", weight: 2, opacity: 1, fillOpacity: 1 }).addTo(activeMap).bindPopup("Last Recorded Position");
+ 
+                if (isStationary) {
+                    activeMap.setView([route[0].lat, route[0].lng], 16);
+                } else {
+                    activeMap.fitBounds(L.polyline(allPoints).getBounds(), { padding: [40, 40] });
+                }
+ 
+                // CRITICAL: Leaflet Size Fix (Multi-step)
+                setTimeout(() => { activeMap.invalidateSize(); }, 100);
+                setTimeout(() => { activeMap.invalidateSize(); }, 300);
+                setTimeout(() => { activeMap.invalidateSize(); }, 600);
  
                 // Update UI Summary
                 const summary = document.getElementById('map-modal-subtitle');
@@ -778,13 +811,17 @@
                 state.view = 'vehicles';
                 state.selectedVehicle = null;
             }
-            render();
+            // Rapid Render for better feel
+            requestAnimationFrame(render);
         }
 
         function updateDOM(id, html) {
             const el = document.getElementById(id);
-            if(el && el.innerHTML !== html) {
+            if(!el) return;
+            // Only update if content changed or if it's currently a skeleton
+            if(el.innerHTML !== html || el.classList.contains('is-skeleton')) {
                 el.innerHTML = html;
+                el.classList.remove('is-skeleton');
             }
         }
 
@@ -809,22 +846,42 @@
                 showView('view-loader');
                 return;
             }
-
-            if (state.view === 'login') {
+ 
+            // Pre-calculate view to avoid mid-render logic
+            const view = state.view;
+            
+            if (view === 'login') {
                 updateDOM('view-login', renderLogin());
                 showView('view-login');
-            } else if (state.view === 'vehicles') {
-                updateDOM('view-vehicles', renderVehicles());
+            } else if (view === 'vehicles') {
+                if (!loaded.vehicles) {
+                    updateDOM('view-vehicles', renderSkeletonVehicles());
+                } else {
+                    updateDOM('view-vehicles', renderVehicles());
+                }
                 showView('view-vehicles');
-            } else if (state.view === 'active_trip') {
+            } else if (view === 'active_trip') {
                 updateDOM('view-active-trip', renderActiveTrip());
                 showView('view-active-trip');
-            } else if (state.view === 'admin') {
+            } else if (view === 'admin') {
                 updateDOM('view-admin', renderAdmin());
                 showView('view-admin');
             }
         }
-
+ 
+        function renderSkeletonVehicles() {
+            const items = [1,2,3].map(() => `
+                <div class="bg-white rounded-3xl h-64 skeleton opacity-50 border border-slate-100"></div>
+            `).join('');
+            return `
+            <div class="w-full h-screen p-8 is-skeleton">
+                <div class="h-10 w-48 skeleton rounded-xl mb-8"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    ${items}
+                </div>
+            </div>`;
+        }
+        
         function renderLogin() {
             return `
             <div class="w-full max-w-sm px-6 fade-in flex flex-col items-center">
@@ -909,12 +966,12 @@
                 let statusBadge, actionBtn, glowClass;
                 if (isTaken) {
                     glowClass = 'status-glow-taken';
-                    statusBadge = `<span class="glass-panel text-blue-700 px-3 py-1.5 rounded-full text-[10px] font-bold border border-blue-200/50 shadow-sm uppercase tracking-widest flex items-center gap-1.5"><i class="fas fa-user-lock text-[10px]"></i> ${dName}</span>`;
-                    actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-3.5 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all text-xs uppercase tracking-widest">Take Over Vehicle</button>`;
+                    statusBadge = `<span class="glass-panel text-blue-700 px-3 py-2 rounded-full text-[10px] font-bold border border-blue-200/50 shadow-sm uppercase tracking-widest flex items-center gap-1.5"><i class="fas fa-user-lock text-[10px]"></i> ${dName}</span>`;
+                    actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-4 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all text-xs uppercase tracking-widest btn-modern">Take Over Vehicle</button>`;
                 } else {
                     glowClass = 'status-glow-ready';
-                    statusBadge = `<span class="glass-panel text-emerald-700 px-3 py-1.5 rounded-full text-[10px] font-bold border border-emerald-200/50 shadow-sm uppercase tracking-widest flex items-center gap-1.5"><div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Available</span>`;
-                    actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-3.5 btn-fancy text-white font-bold rounded-xl shadow-lg text-xs uppercase tracking-widest">Launch Trip</button>`;
+                    statusBadge = `<span class="glass-panel text-emerald-700 px-3 py-2 rounded-full text-[10px] font-bold border border-emerald-200/50 shadow-sm uppercase tracking-widest flex items-center gap-1.5"><div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Available</span>`;
+                    actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-4 btn-fancy text-white font-bold rounded-xl shadow-lg text-sm uppercase tracking-widest btn-modern">Launch Trip</button>`;
                 }
  
                 // Compliance Visuals (Wellness Rings)
@@ -989,7 +1046,7 @@
                 </header>
                 
                 <h2 class="text-2xl font-bold mb-6 px-6 text-slate-800 font-heading tracking-tight uppercase">Select a Vehicle</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-6">
+                <div class="mobile-card-stack grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-6">
                     ${vehicleCards}
                 </div>
             </div>`;
@@ -1351,7 +1408,7 @@
                                         <p class="text-[10px] text-slate-400 italic text-center leading-relaxed px-4">Regular admins have view-only access to logbooks and fleet data. Edit/Delete rights are reserved for Super Admin.</p>
                                     </div>
                                 ` : `
-                                    <div class="py-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                    <div class="py-8 text-center bg-slate-50 rounded-xl border border-dashed border-200">
                                         <i class="fas fa-lock text-slate-300 text-3xl mb-3"></i>
                                         <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Access Restricted</p>
                                         <p class="text-[10px] text-slate-400 px-6 mt-1">Only Super Admin can manage other admin accounts.</p>
@@ -1474,31 +1531,33 @@
                 window.handleLoginSubmit();
             }
         });
-
-
-        // Modals & Toast
         window.openModal = (modalId, contentId) => {
             const m = document.getElementById(modalId);
             const c = document.getElementById(contentId);
             if(!m || !c) return;
             m.classList.remove('hidden');
+            m.classList.add('flex');
             setTimeout(() => {
-                m.classList.remove('opacity-0');
-                c.classList.remove('scale-95');
+                m.classList.add('opacity-100');
+                c.classList.add('opacity-100', 'scale-100');
+                c.classList.remove('opacity-0', 'scale-95');
             }, 10);
         };
-
+ 
         window.closeModal = (modalId, contentId) => {
             const m = document.getElementById(modalId);
             const c = document.getElementById(contentId);
             if(!m || !c) return;
-            m.classList.add('opacity-0');
-            c.classList.add('scale-95');
-            setTimeout(() => m.classList.add('hidden'), 300);
+            m.classList.remove('opacity-100');
+            c.classList.remove('opacity-100', 'scale-100');
+            c.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => {
+                m.classList.add('hidden');
+                m.classList.remove('flex');
+            }, 300);
         };
 
         window.showToast = (msg, isError = false) => {
-            const t = document.getElementById('toast');
             if(!t) return;
             t.textContent = msg;
             t.className = `fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3.5 rounded-full shadow-lg text-sm font-medium transition-all duration-300 z-[100] flex items-center justify-center pointer-events-none min-w-[280px] ${isError ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'}`;
@@ -1553,7 +1612,7 @@
                 document.getElementById('start-success').classList.remove('hidden');
                 document.getElementById('start-success').classList.add('flex');
  
-                // Capture GPS
+                // Capture GPS ONCE
                 const coords = await getCurrentCoords();
 
                 // â”€â”€â”€ TAKEOVER: Auto-close previous driver's trip with the entered KM â”€â”€â”€
@@ -1609,7 +1668,7 @@
                         document.getElementById('purpose-input').value = '';
                         document.getElementById('start-km-input').value = '';
                     }, 300);
-                }, 1500);
+                }, 800);
 
             } catch(e) {
                 console.error(e);
@@ -1637,7 +1696,7 @@
                 document.getElementById('stop-success').classList.remove('hidden');
                 document.getElementById('stop-success').classList.add('flex');
  
-                // Capture GPS
+                // Capture GPS ONCE
                 const coords = await getCurrentCoords();
 
                 await updateDoc(getDocRef('vehicles', v.id), {
@@ -1655,7 +1714,7 @@
                         window.showToast(`Error: Odometer cannot be less than start (${activeLog.startingKm})`, true);
                         return;
                     }
-                    const coords = await getCurrentCoords();
+                    
                     await updateDoc(getDocRef('logs', activeLog.id), {
                         status: 'Closed',
                         endTime: new Date().toISOString(),
@@ -1682,7 +1741,7 @@
                         state.selectedVehicle = null;
                         handleAutoBypass();
                     }, 300);
-                }, 1500);
+                }, 800);
 
             } catch(e) {
                 console.error(e);
