@@ -11,239 +11,399 @@
     <!-- jsPDF & AutoTable -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- Leaflet JS & CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600&display=swap');
         
         body { 
-            font-family: 'Inter', sans-serif;
-            background-color: #020617; /* slate-950 */
-            color: #f8fafc; /* slate-50 */
+            font-family: 'Open Sans', sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
             background-image: 
-                radial-gradient(circle at 15% 50%, rgba(14, 165, 233, 0.08), transparent 25%),
-                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
+                radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.05), transparent 30%),
+                radial-gradient(circle at 90% 80%, rgba(167, 139, 250, 0.05), transparent 30%);
         }
         
-        h1, h2, h3, .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+        h1, h2, h3, .font-heading { font-family: 'Roboto', sans-serif; }
 
-        /* Sleek scrollbar - neon blue */
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: rgba(2, 6, 23, 0.5); }
-        ::-webkit-scrollbar-thumb { background: #0ea5e9; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
         .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes fadeIn { 
-            from { opacity: 0; transform: translateY(15px) scale(0.98); filter: blur(4px); } 
-            to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 
+            from { opacity: 0; transform: translateY(10px); } 
+            to { opacity: 1; transform: translateY(0); } 
         }
 
         .slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
+            from { opacity: 0; transform: translateY(15px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.6); /* slate-900 */
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(56, 189, 248, 0.1); /* sky-400 */
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+        .btn-modern { transition: all 0.2s ease; }
+        .btn-modern:active { transform: scale(0.97); }
+
+        .drive-off { animation: driveOff 1.5s cubic-bezier(0.5, 0, 0.2, 1) forwards; }
+        @keyframes driveOff {
+            0% { transform: translateX(-150px); opacity: 0; }
+            20% { opacity: 1; transform: translateX(0); }
+            40% { transform: translateX(-20px); opacity: 1; }
+            100% { transform: translateX(800px) scale(1.1); opacity: 0; filter: blur(4px); }
         }
 
-        .neon-border {
-            box-shadow: 0 0 10px rgba(14, 165, 233, 0.3), inset 0 0 10px rgba(14, 165, 233, 0.1);
-            border: 1px solid rgba(14, 165, 233, 0.4);
+        .drive-park { animation: drivePark 1.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+        @keyframes drivePark {
+            0% { transform: translateX(-800px) scale(1.1); opacity: 0; filter: blur(8px); }
+            60% { transform: translateX(40px) scale(1); opacity: 1; filter: blur(0); }
+            80% { transform: translateX(-10px); }
+            100% { transform: translateX(0); opacity: 1; filter: blur(0); }
+        }
+ 
+        .lock-pulse { animation: lockPulse 0.8s ease-in-out infinite; }
+        @keyframes lockPulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+ 
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+ 
+        /* Dashboard & Card Aesthetics */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.4);
         }
         
-        .neon-border-green {
-            box-shadow: 0 0 15px rgba(16, 185, 129, 0.3), inset 0 0 10px rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.4);
+        .card-perspective {
+            perspective: 1200px;
         }
-
-        .neon-text {
-            text-shadow: 0 0 8px rgba(14, 165, 233, 0.6);
-        }
-
-        /* Input hiding arrows */
-        input[type="number"]::-webkit-inner-spin-button,
-        input[type="number"]::-webkit-outer-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-
-        .btn-modern { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
-        .btn-modern:active { transform: scale(0.95); }
-
-        .success-anim { animation: successScale 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        @keyframes successScale {
-            0% { transform: scale(0.5); opacity: 0; filter: blur(10px); }
-            100% { transform: scale(1); opacity: 1; filter: blur(0); }
-        }
-
-        /* Isometric / Holographic card effect */
-        .holo-card {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        
+        .card-tilt {
+            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s ease;
             transform-style: preserve-3d;
         }
-        .holo-card:hover {
-            transform: translateY(-5px) scale(1.02);
-            box-shadow: 0 20px 40px -10px rgba(14, 165, 233, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
-            border-color: rgba(14, 165, 233, 0.3);
+        
+        .card-tilt:hover {
+            transform: translateY(-10px) rotateX(3deg) rotateY(1deg);
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.18);
         }
+ 
+        .status-glow-ready {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+            animation: status-pulse-green 3s infinite;
+        }
+        
+        @keyframes status-pulse-green {
+            0%, 100% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.1); }
+            50% { box-shadow: 0 0 25px rgba(16, 185, 129, 0.4); }
+        }
+ 
+        .status-glow-taken {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+            animation: status-pulse-blue 3s infinite;
+        }
+ 
+        @keyframes status-pulse-blue {
+            0%, 100% { box-shadow: 0 0 8px rgba(59, 130, 246, 0.1); }
+            50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+        }
+ 
+        .blueprint-bg {
+            background-color: #f8fafc;
+            background-image: 
+                linear-gradient(rgba(226, 232, 240, 0.5) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(226, 232, 240, 0.5) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+ 
+        .license-plate-modern {
+            font-family: 'Monaco', 'Consolas', monospace;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+            letter-spacing: 0.1em;
+        }
+ 
+        .img-zoom-hover {
+            transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .card-tilt:hover .img-zoom-hover {
+            transform: scale(1.1);
+        }
+        #map { height: 400px; width: 100%; border-radius: 1rem; }
+        .map-modal-container { max-width: 95vw !important; width: 800px !important; }
+ 
+        .btn-fancy {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+            transition: all 0.3s ease;
+        }
+        .btn-fancy:hover {
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* Wellness Rings */
+        .wellness-ring {
+            position: absolute;
+            inset: -4px;
+            border-radius: 2rem;
+            padding: 2px;
+            z-index: -1;
+            transition: all 0.5s ease;
+        }
+        .wellness-ring-ok { background: conic-gradient(from 0deg, #10b981 0%, #34d399 25%, #10b981 50%, #34d399 75%, #10b981 100%); }
+        .wellness-ring-warning { background: conic-gradient(from 0deg, #f59e0b 0%, #fbbf24 25%, #f59e0b 50%, #fbbf24 75%, #f59e0b 100%); }
+        .wellness-ring-critical { background: conic-gradient(from 0deg, #ef4444 0%, #f87171 25%, #ef4444 50%, #f87171 75%, #ef4444 100%); }
+        
+        .wellness-ring-pulse {
+            animation: ring-rotate 4s linear infinite;
+        }
+        @keyframes ring-rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Tab Transition */
+        .tab-content-enter {
+            animation: tabEnter 0.4s ease-out forwards;
+        }
+        @keyframes tabEnter {
+            from { opacity: 0; transform: scale(0.98) translateY(5px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
     </style>
 </head>
-<body class="antialiased overflow-x-hidden selection:bg-sky-500/30 selection:text-sky-200 min-h-screen flex flex-col relative">
-    
-    <!-- Ambient glowing orbs behind everything -->
-    <div class="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-sky-900/20 blur-[120px] pointer-events-none -z-10"></div>
-    <div class="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-900/20 blur-[120px] pointer-events-none -z-10"></div>
+<body class="antialiased overflow-x-hidden selection:bg-blue-200 selection:text-blue-900 min-h-screen flex flex-col relative text-slate-800">
 
     <div id="app" class="flex-1 w-full max-w-5xl mx-auto flex flex-col items-center">
-        <!-- Persistent View Containers to avoid flashing full innerHTML -->
         <div id="view-loader" class="w-full min-h-screen flex items-center justify-center">
-            <i class="fas fa-circle-notch fa-spin text-4xl text-sky-400"></i>
+            <i class="fas fa-circle-notch fa-spin text-4xl text-blue-500"></i>
         </div>
-        <div id="view-login" class="w-full hidden justify-center items-center min-h-screen"></div>
-        <div id="view-vehicles" class="w-full hidden justify-start flex-col"></div>
-        <div id="view-active-trip" class="w-full hidden justify-start flex-col"></div>
-        <div id="view-admin" class="w-full hidden justify-start flex-col"></div>
+        <div id="view-login" class="w-full hidden justify-center items-center min-h-screen" style="display:none;"></div>
+        <div id="view-vehicles" class="w-full hidden justify-start flex-col px-4 w-full"></div>
+        <div id="view-active-trip" class="w-full hidden justify-start flex-col px-4 w-full"></div>
+        <div id="view-admin" class="w-full hidden justify-start flex-col px-4 w-full"></div>
     </div>
 
     <!-- Start Trip Modal -->
-    <div id="start-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="glass-panel border-sky-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] transform scale-95 transition-transform duration-300 holo-card bg-slate-900" id="start-modal-content">
-            <div class="p-5 border-b border-sky-500/20 flex justify-between items-center bg-slate-950/60">
-                <h3 class="font-bold text-lg text-white font-rajdhani uppercase tracking-widest neon-text">Link Initialization</h3>
-                <button onclick="window.closeModal('start-modal', 'start-modal-content')" class="text-sky-500/50 hover:text-sky-400 transition-colors"><i class="fas fa-times"></i></button>
+    <div id="start-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 relative" id="start-modal-content">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-lg text-slate-800 font-heading tracking-wide">Start Trip</h3>
+                <button onclick="window.closeModal('start-modal', 'start-modal-content')" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fas fa-times text-lg"></i></button>
             </div>
             
-            <div id="start-form" class="p-6 bg-slate-900/40 relative">
-                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none"></div>
-                <p id="start-modal-text" class="text-xs text-sky-200/70 mb-6 font-mono uppercase tracking-[0.2em] relative z-10"></p>
-                
-                <div class="mb-6 relative z-10">
-                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Directive / Purpose</label>
-                    <input type="text" id="purpose-input" placeholder="e.g., SECTOR PATROL" class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50">
+            <div id="start-form" class="p-6">
+                <p id="start-modal-text" class="text-sm text-slate-500 mb-6 font-medium leading-relaxed">Enter trip details and confirm starting odometer to begin.</p>
+ 
+                <div id="start-km-group" class="mb-5">
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Starting KM (Odometer)</label>
+                    <input type="number" id="start-km-input" placeholder="e.g., 45120" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all text-xl font-bold text-center">
+                    <p id="last-km-hint" class="text-[10px] text-slate-400 mt-2 font-medium uppercase tracking-wider text-center"></p>
+                </div>
+ 
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Trip Purpose</label>
+                    <input type="text" id="purpose-input" placeholder="e.g., Delivery Route" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all text-sm">
                 </div>
                 
-                <div class="flex justify-center mt-10 mb-4 relative z-10">
-                    <!-- Futuristic 3D Push Button -->
-                    <button id="start-btn" onclick="window.confirmStartDriving()" class="relative w-36 h-36 rounded-full bg-slate-900 border border-sky-500/20 shadow-[0_15px_35px_rgba(0,0,0,0.5),inset_0_-5px_15px_rgba(0,0,0,0.4),inset_0_5px_15px_rgba(56,189,248,0.2)] flex flex-col items-center justify-center transition-all duration-200 hover:shadow-[0_20px_40px_rgba(16,185,129,0.2)] active:transform active:scale-95 active:shadow-[0_5px_10px_rgba(0,0,0,0.5)] group outline-none focus:ring-4 focus:ring-emerald-500/30">
-                        <div class="absolute inset-4 rounded-full border border-sky-500/30 bg-gradient-to-b from-slate-800 to-slate-900 shadow-[inset_0_-2px_10px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center pointer-events-none group-active:from-slate-900 transition-colors">
-                            <i class="fas fa-power-off text-emerald-500 text-3xl mb-1 group-hover:text-emerald-400 group-active:text-emerald-600 transition-colors drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]"></i>
-                            <span class="text-xl font-bold font-rajdhani tracking-[0.2em] text-emerald-500 group-hover:text-emerald-400 transition-colors group-active:text-emerald-600 drop-shadow-[0_0_5px_rgba(16,185,129,0.5)]">START</span>
-                        </div>
-                    </button>
-                </div>
-            </div>
-
-            <div id="start-success" class="hidden p-8 flex-col items-center justify-center h-[300px] bg-slate-900/40 relative">
-                <!-- Abstract holographic car start animation -->
-                <div class="relative w-32 h-32 flex items-center justify-center mb-6">
-                    <div class="absolute inset-0 border-[3px] border-emerald-500/50 rounded-full animate-[ping_1.5s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
-                    <div class="absolute inset-2 border border-emerald-400/30 rounded-full animate-[spin_4s_linear_infinite]"></div>
-                    <div class="absolute inset-4 border border-emerald-400/20 rounded-full animate-[spin_3s_linear_infinite_reverse]"></div>
-                    <i class="fas fa-space-shuttle text-emerald-400 text-5xl transform -rotate-45 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] success-anim"></i>
-                </div>
-                <h3 class="text-xl font-bold text-emerald-400 font-rajdhani tracking-widest uppercase neon-text">Link Established</h3>
-                <p class="text-xs font-mono text-emerald-200/50 mt-2 uppercase tracking-[0.2em]">Telemetry Active</p>
+                <button id="start-btn" onclick="window.confirmStartDriving()" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold font-heading text-lg tracking-wide shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                    <i class="fas fa-play"></i> Start Driving
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Stop Trip Modal -->
-    <div id="stop-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="glass-panel border-indigo-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(99,102,241,0.2)] transform scale-95 transition-transform duration-300 holo-card bg-slate-900" id="stop-modal-content">
-            <div class="p-5 border-b border-indigo-500/20 flex justify-between items-center bg-slate-950/60">
-                <h3 class="font-bold text-lg text-white font-rajdhani uppercase tracking-widest neon-text">Secure Unit</h3>
-                <button onclick="window.closeModal('stop-modal', 'stop-modal-content')" class="text-indigo-500/50 hover:text-indigo-400 transition-colors"><i class="fas fa-times"></i></button>
+    <!-- Full Screen Override Animation for Start -->
+    <div id="start-success" class="hidden flex-col items-center justify-center fixed inset-0 w-screen h-screen bg-white z-[999] overflow-hidden">
+        <div class="relative w-full max-w-2xl h-64 flex flex-col items-center justify-center">
+            <div class="w-full h-1 border-b-4 border-dashed border-slate-200 absolute bottom-[20%]"></div>
+            <i class="fas fa-car-side text-blue-500 text-8xl drive-off absolute bottom-[20%]"></i>
+        </div>
+        <h3 class="text-3xl font-bold text-blue-600 font-heading mb-2">Trip Started!</h3>
+        <p class="text-slate-500">Safe travels. Tracking your route.</p>
+    </div>
+
+    <!-- Full Screen Override Animation for Stop -->
+    <div id="stop-success" class="hidden flex-col items-center justify-center fixed inset-0 w-screen h-screen bg-white z-[999] overflow-hidden text-center p-6">
+        <div class="relative w-64 h-64 bg-slate-100 rounded-3xl border-4 border-dashed border-slate-300 mb-10 flex items-center justify-center">
+            <div class="absolute inset-0 flex items-center justify-center opacity-10">
+                <span class="text-4xl font-bold font-heading uppercase tracking-[0.2em] rotate-[-45deg] scale-150">Parked</span>
             </div>
-            <div id="stop-form" class="p-6 bg-slate-900/40 relative">
-                <div class="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-transparent pointer-events-none"></div>
-                <p class="text-xs text-indigo-200/70 mb-6 font-mono uppercase tracking-[0.2em] relative z-10" id="stop-modal-text">Finalize End Odometer to Disengage.</p>
+            <i class="fas fa-car-side text-emerald-500 text-9xl drive-park relative z-10"></i>
+            <div class="absolute -top-4 -right-4 bg-emerald-100 p-4 rounded-full border-4 border-white shadow-xl lock-pulse">
+                <i class="fas fa-lock text-emerald-600 text-2xl"></i>
+            </div>
+        </div>
+        <h3 class="text-4xl font-bold text-emerald-600 font-heading mb-3 tracking-tight">Vehicle Secured</h3>
+        <p class="text-slate-500 font-medium px-8 leading-relaxed max-w-sm">Trip completed successfully. System locked and data synchronized.</p>
+    </div>
+
+    <!-- Stop Trip Modal -->
+    <div id="stop-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 relative" id="stop-modal-content">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-lg text-slate-800 font-heading tracking-wide">Stop Trip</h3>
+                <button onclick="window.closeModal('stop-modal', 'stop-modal-content')" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <div id="stop-form" class="p-6">
+                <p class="text-sm text-slate-500 mb-6 font-medium" id="stop-modal-text">Enter final odometer reading to park securely.</p>
                 
-                <div class="mb-6 relative z-10">
-                    <label class="block text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-2 font-mono">Current Odometer (KM)</label>
-                    <input type="number" id="ending-km-input" placeholder="e.g., 45120" class="w-full p-4 bg-slate-950 border border-indigo-500/30 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 focus:outline-none text-indigo-100 transition-all font-mono text-xl tracking-[0.2em] shadow-inner placeholder-indigo-900/50 text-center">
+                <div class="mb-5">
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Ending KM (Odometer)</label>
+                    <input type="number" id="ending-km-input" placeholder="e.g., 45120" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none text-slate-800 transition-all text-xl font-bold text-center">
                 </div>
 
-                <div class="flex justify-center mt-8 mb-2 relative z-10">
-                    <!-- Futuristic 3D Stop Button -->
-                    <button id="stop-btn" onclick="window.confirmStopDriving()" class="relative w-36 h-36 rounded-full bg-slate-900 border border-indigo-500/20 shadow-[0_15px_35px_rgba(0,0,0,0.5),inset_0_-5px_15px_rgba(0,0,0,0.4),inset_0_5px_15px_rgba(244,63,94,0.1)] flex flex-col items-center justify-center transition-all duration-200 hover:shadow-[0_20px_40px_rgba(244,63,94,0.2)] active:transform active:scale-95 active:shadow-[0_5px_10px_rgba(0,0,0,0.5)] group outline-none focus:ring-4 focus:ring-rose-500/30">
-                        <div class="absolute inset-4 rounded-full border border-indigo-500/30 bg-gradient-to-b from-slate-800 to-slate-900 shadow-[inset_0_-2px_10px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center pointer-events-none group-active:from-slate-900 transition-colors">
-                            <i class="fas fa-satellite-dish text-rose-500 text-2xl mb-2 group-hover:text-rose-400 group-active:text-rose-600 transition-colors drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]"></i>
-                            <span class="text-xl font-bold font-rajdhani tracking-[0.2em] text-rose-500 group-hover:text-rose-400 transition-colors group-active:text-rose-600 drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]">STOP</span>
-                        </div>
-                    </button>
+                <div class="mb-8">
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Trip Notes <span class="text-slate-400 font-normal">(Optional)</span></label>
+                    <textarea id="trip-notes-input" placeholder="e.g., Low fuel, slight scratch..." rows="2" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none text-slate-800 transition-all text-sm resize-none"></textarea>
                 </div>
-            </div>
-            <div id="stop-success" class="hidden p-8 flex-col items-center justify-center h-[300px] bg-slate-900/40 relative">
-                <div class="relative w-32 h-32 flex items-center justify-center mb-6">
-                    <div class="absolute inset-0 border-2 border-dashed border-indigo-500/50 rounded-full animate-[spin_6s_linear_infinite]"></div>
-                    <div class="absolute inset-4 border border-indigo-400/30 rounded-full"></div>
-                    <i class="fas fa-lock text-indigo-400 text-5xl drop-shadow-[0_0_15px_rgba(99,102,241,0.8)] success-anim"></i>
-                </div>
-                <h3 class="text-xl font-bold text-indigo-400 font-rajdhani tracking-widest uppercase neon-text">Unit Secured</h3>
-                <p class="text-xs font-mono text-indigo-200/50 mt-2 uppercase tracking-[0.2em]">Link Terminated</p>
+
+                <button id="stop-btn" onclick="window.confirmStopDriving()" class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold font-heading text-lg tracking-wide shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                    <i class="fas fa-map-marker-alt"></i> Park Vehicle
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Add/Edit Vehicle Modal -->
-    <div id="add-vehicle-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="glass-panel border-sky-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] transform scale-95 transition-transform duration-300 holo-card bg-slate-900" id="add-vehicle-content">
-            <div class="p-5 border-b border-sky-500/20 flex justify-between items-center bg-slate-950/60">
-                <h3 id="vehicle-modal-title" class="font-bold text-lg text-white font-rajdhani uppercase tracking-widest neon-text">Unit Editor</h3>
-                <button onclick="window.closeModal('add-vehicle-modal', 'add-vehicle-content')" class="text-sky-500/50 hover:text-sky-400 transition-colors"><i class="fas fa-times"></i></button>
+    <div id="add-vehicle-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300" id="add-vehicle-content">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 id="vehicle-modal-title" class="font-bold text-lg text-slate-800 font-heading tracking-wide">Vehicle Details</h3>
+                <button onclick="window.closeModal('add-vehicle-modal', 'add-vehicle-content')" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fas fa-times text-lg"></i></button>
             </div>
-            <div class="p-6 space-y-5 bg-slate-900/40 relative">
-                <div class="absolute inset-0 bg-gradient-to-br from-sky-500/5 to-transparent pointer-events-none"></div>
-                <div class="relative z-10">
-                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Make & Model</label>
-                    <input type="text" id="new-vehicle-make" placeholder="e.g., TOYOTA CAMRY" class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50 uppercase">
+            <div class="p-6 space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Make & Model</label>
+                    <input type="text" id="new-vehicle-make" placeholder="e.g., Toyota Camry" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all text-sm uppercase">
                 </div>
-                <div class="relative z-10">
-                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Callsign / Plate</label>
-                    <input type="text" id="new-vehicle-plate" placeholder="e.g., XJ-982" class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50 uppercase">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">License Plate</label>
+                    <input type="text" id="new-vehicle-plate" placeholder="e.g., L-12345" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all text-sm uppercase">
                 </div>
-                <div class="relative z-10">
-                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Image URL (Optional)</label>
-                    <input type="text" id="new-vehicle-photo" placeholder="https://..." class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50">
+                <!-- Expiry & Maintenance Fields -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Mulkiya Expiry</label>
+                        <input type="date" id="new-vehicle-mulkiya" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Insurance Expiry</label>
+                        <input type="date" id="new-vehicle-insurance" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-sm focus:ring-2 focus:ring-blue-500/20 focus:outline-none">
+                    </div>
                 </div>
-                <button onclick="window.submitVehicle()" class="btn-modern w-full bg-slate-900 hover:bg-slate-800 text-sky-400 hover:text-sky-300 py-4 rounded-xl font-bold neon-border transition-all font-rajdhani text-lg tracking-widest uppercase mt-4 relative z-10">Commit Unit</button>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Next Oil Change (KM)</label>
+                    <input type="number" id="new-vehicle-oil" placeholder="e.g., 55000" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all text-sm font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Vehicle Photo <span class="text-slate-400 font-normal">(Optional)</span></label>
+                    <input type="file" id="new-vehicle-photo-file" accept="image/*" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-slate-600 transition-all text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer">
+                    <input type="hidden" id="new-vehicle-photo">
+                </div>
+                <button onclick="window.submitVehicle()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold font-heading text-base tracking-wide shadow-md transition-all active:scale-[0.98] mt-2">Save Vehicle</button>
             </div>
         </div>
     </div>
 
     <!-- Add/Edit Driver Modal -->
-    <div id="add-driver-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="glass-panel border-sky-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(14,165,233,0.2)] transform scale-95 transition-transform duration-300 holo-card bg-slate-900" id="add-driver-content">
-            <div class="p-5 border-b border-sky-500/20 flex justify-between items-center bg-slate-950/60">
-                <h3 id="driver-modal-title" class="font-bold text-lg text-white font-rajdhani uppercase tracking-widest neon-text">Pilot Editor</h3>
-                <button onclick="window.closeModal('add-driver-modal', 'add-driver-content')" class="text-sky-500/50 hover:text-sky-400 transition-colors"><i class="fas fa-times"></i></button>
+    <div id="add-driver-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300" id="add-driver-content">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 id="driver-modal-title" class="font-bold text-lg text-slate-800 font-heading tracking-wide">Driver Details</h3>
+                <button onclick="window.closeModal('add-driver-modal', 'add-driver-content')" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fas fa-times text-lg"></i></button>
             </div>
-            <div class="p-6 space-y-5 bg-slate-900/40 relative">
-                <div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent pointer-events-none"></div>
-                <div class="relative z-10">
-                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Pilot Designation</label>
-                    <input type="text" id="new-driver-name" placeholder="e.g., J. DOE" class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50 uppercase">
+            <div class="p-6 space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Full Name</label>
+                    <input type="text" id="new-driver-name" placeholder="e.g., John Doe" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all text-sm uppercase">
                 </div>
-                <div class="relative z-10">
-                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Auth Token (4-PIN)</label>
-                    <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="new-driver-pin" placeholder="••••" class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono tracking-[1em] text-center text-xl font-bold shadow-inner placeholder-sky-900/50">
-                    <p class="text-[9px] text-sky-500/50 mt-2 hidden font-mono uppercase tracking-widest" id="edit-pin-hint">Leave blank to retain current auth</p>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Driver PIN (4 digits)</label>
+                    <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="new-driver-pin" placeholder="••••" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all text-center text-xl font-bold tracking-[0.5em]">
+                    <p class="text-[10px] text-slate-500 mt-2 hidden" id="edit-pin-hint">Leave blank to keep current PIN</p>
                 </div>
-                <div class="relative z-10">
-                    <label class="block text-[10px] font-bold text-sky-400 uppercase tracking-[0.2em] mb-2 font-mono">Image URL (Optional)</label>
-                    <input type="text" id="new-driver-photo" placeholder="https://..." class="w-full p-4 bg-slate-950 border border-sky-500/30 rounded-xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 focus:outline-none text-sky-100 transition-all font-mono text-sm shadow-inner placeholder-sky-900/50">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Driver Photo <span class="text-slate-400 font-normal">(Optional)</span></label>
+                    <input type="file" id="new-driver-photo-file" accept="image/*" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-slate-600 transition-all text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer">
+                    <input type="hidden" id="new-driver-photo">
                 </div>
-                <button onclick="window.submitDriver()" class="btn-modern w-full bg-slate-900 hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 py-4 rounded-xl font-bold border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)] transition-all font-rajdhani text-lg tracking-widest uppercase mt-4 relative z-10">Commit Pilot</button>
+                <button onclick="window.submitDriver()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold font-heading text-base tracking-wide shadow-md transition-all active:scale-[0.98] mt-2">Save Driver</button>
             </div>
         </div>
     </div>
 
+    <!-- Edit Log Modal -->
+    <div id="edit-log-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 relative" id="edit-log-modal-content">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-slate-800 font-heading uppercase tracking-tight">Edit Log Entry</h3>
+                <button onclick="window.closeModal('edit-log-modal', 'edit-log-modal-content')" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="edit-log-id">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 pl-1">Starting KM</label>
+                    <input type="number" id="edit-log-start" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 pl-1">Ending KM</label>
+                    <input type="number" id="edit-log-end" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 pl-1">Purpose</label>
+                    <input type="text" id="edit-log-purpose" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 text-sm">
+                </div>
+                <button onclick="window.submitLogEdit()" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold font-heading text-sm tracking-widest uppercase transition-all shadow-md">Update Log</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Viewer Modal -->
+    <div id="map-modal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden" onclick="if(event.target === this) window.closeModal('map-modal', 'map-modal-content')">
+        <div id="map-modal-content" class="bg-white rounded-[2.5rem] w-full max-w-4xl overflow-hidden shadow-2xl border border-white/20 transform scale-95 opacity-0 transition-all duration-300">
+            <div class="p-8">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800 font-heading uppercase tracking-tight">Trip Route Analysis</h2>
+                        <p id="map-modal-subtitle" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Movement Breadcrumbs</p>
+                    </div>
+                    <button onclick="window.closeModal('map-modal', 'map-modal-content')" class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all flex items-center justify-center">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="map" class="shadow-inner border border-slate-100"></div>
+                <div class="mt-6 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Start</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">End</span>
+                        </div>
+                    </div>
+                    <p id="map-modal-distance" class="text-sm font-bold text-blue-600 font-heading uppercase tracking-wide"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+ 
     <!-- Toast -->
     <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3.5 rounded-full shadow-lg text-sm font-medium transition-all duration-300 opacity-0 -translate-y-4 z-[100] flex items-center justify-center pointer-events-none min-w-[280px]"></div>
 
@@ -251,7 +411,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, persistentLocalCache, collection, onSnapshot, doc, updateDoc, addDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase config
         const firebaseConfig = {
@@ -265,19 +425,21 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
+        // Offline persistence: data is cached in IndexedDB â€” works even after tab is closed
+        const db = initializeFirestore(app, { localCache: persistentLocalCache() });
 
         const APP_ID = "eic-fleet";
         const getCol = (name) => collection(db, 'artifacts', APP_ID, 'public', 'data', name);
         const getDocRef = (colName, docId) => doc(db, 'artifacts', APP_ID, 'public', 'data', colName, docId);
-
-        const ADMIN_PIN = '9999';
-
+        const ADMIN_PIN = '8891190911';
+ 
         let state = {
             view: 'login', // 'login', 'vehicles', 'admin', 'active_trip'
             adminTab: 'logbook',
+            adminRole: null, // 'super', 'regular'
             currentUser: null,
             drivers: [],
+            admins: [],
             vehicles: [],
             logs: [],
             selectedVehicle: null,
@@ -285,8 +447,183 @@
             editingDriverId: null,
             isLoading: true
         };
+ 
+        let loaded = { drivers: false, admins: false, vehicles: false, logs: false };
+        let isOnline = navigator.onLine;
+        window.addEventListener('online',  () => { isOnline = true;  render(); window.showToast('Connection restored â€” syncing data'); });
+        window.addEventListener('offline', () => { isOnline = false; render(); window.showToast('Offline mode â€” changes will sync when reconnected.', true); });
 
-        let loaded = { drivers: false, vehicles: false, logs: false };
+        function getCompliance(v) {
+            const now = new Date();
+            const alerts = [];
+            
+            // Expiries (5-day warning)
+            ['mulkiyaExpiry', 'insuranceExpiry'].forEach(key => {
+                if (v[key]) {
+                    const exp = new Date(v[key]);
+                    const diff = (exp - now) / (1000 * 60 * 60 * 24);
+                    const label = key === 'mulkiyaExpiry' ? 'Mulkiya' : 'Insurance';
+                    if (diff <= 0) alerts.push({ type: 'error', msg: `${label} Expired`, icon: 'fa-file-circle-xmark' });
+                    else if (diff <= 5) alerts.push({ type: 'warning', msg: `${label} expires in ${Math.ceil(diff)}d`, icon: 'fa-file-circle-exclamation' });
+                }
+            });
+
+            // Oil Change (Overdue after 10,000 KM threshold)
+            if (v.nextOilChangeKm) {
+                const lastLog = state.logs.filter(l => l.vehicleId === v.id && l.endingKm != null)
+                                 .sort((a,b) => new Date(b.endTime) - new Date(a.endTime))[0];
+                const currentKm = lastLog ? lastLog.endingKm : 0;
+                const diff = v.nextOilChangeKm - currentKm;
+                if (diff <= 0) alerts.push({ type: 'error', msg: `Oil Change Overdue (${Math.abs(diff)}km)`, icon: 'fa-oil-can' });
+            }
+
+            return alerts;
+        }
+ 
+        // --- Stealth Tracking & Mapping ---
+        let trackingInterval = null;
+        let activeMap = null;
+ 
+        async function startStealthTracking(logId) {
+            if (trackingInterval) clearInterval(trackingInterval);
+            
+            // Initial breadcrumb
+            const firstCoords = await getCurrentCoords();
+            if (firstCoords.lat) {
+                await updateDoc(getDocRef('logs', logId), {
+                    route: arrayUnion({ lat: firstCoords.lat, lng: firstCoords.lng, ts: Date.now() })
+                });
+            }
+ 
+            // Periodic breadcrumbs every 2 minutes
+            trackingInterval = setInterval(async () => {
+                const coords = await getCurrentCoords();
+                if (coords.lat) {
+                    try {
+                        await updateDoc(getDocRef('logs', logId), {
+                            route: arrayUnion({ lat: coords.lat, lng: coords.lng, ts: Date.now() })
+                        });
+                    } catch (e) { console.error("Tracking Error:", e); }
+                }
+            }, 120000); // 2 minutes
+        }
+ 
+        // --- Distance Helper (Haversine Formula) ---
+        function getGapDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of earth in KM
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; 
+        }
+ 
+        window.viewTripMap = async (logId) => {
+            const log = state.logs.find(l => l.id === logId);
+            if (!log || !log.route || log.route.length === 0) {
+                window.showToast("No movement data recorded for this trip", true);
+                return;
+            }
+ 
+            window.openModal('map-modal', 'map-modal-content');
+            
+            setTimeout(() => {
+                if (activeMap) { activeMap.remove(); activeMap = null; }
+ 
+                const route = log.route;
+                activeMap = L.map('map').setView([route[0].lat, route[0].lng], 15);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(activeMap);
+ 
+                let gapsCount = 0;
+                let totalGapKm = 0;
+                let currentSegment = [ [route[0].lat, route[0].lng] ];
+ 
+                for (let i = 1; i < route.length; i++) {
+                    const p1 = route[i-1];
+                    const p2 = route[i];
+                    const dist = getGapDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+ 
+                    if (dist > 2) { 
+                        // GAP DETECTED
+                        gapsCount++;
+                        totalGapKm += dist;
+                        
+                        // 1. Draw solid segment up to this point
+                        L.polyline(currentSegment, { color: '#2563eb', weight: 4 }).addTo(activeMap);
+                        
+                        // 2. Draw dashed RED gap line
+                        const gapPoints = [ [p1.lat, p1.lng], [p2.lat, p2.lng] ];
+                        L.polyline(gapPoints, { color: '#ef4444', weight: 3, dashArray: '8, 12' }).addTo(activeMap)
+                          .bindPopup(`Tracking Gap: ${dist.toFixed(1)} km`);
+ 
+                        // 3. Start a fresh segment
+                        currentSegment = [ [p2.lat, p2.lng] ];
+                    } else {
+                        currentSegment.push([p2.lat, p2.lng]);
+                    }
+                }
+ 
+                // Draw final segment
+                if (currentSegment.length > 1) {
+                    L.polyline(currentSegment, { color: '#2563eb', weight: 4 }).addTo(activeMap);
+                }
+ 
+                // Markers & Bounds
+                L.circleMarker([route[0].lat, route[0].lng], { radius: 6, fillColor: "#10b981", color: "#fff", weight: 2, opacity: 1, fillOpacity: 1 }).addTo(activeMap).bindPopup("Start");
+                const last = route[route.length - 1];
+                L.circleMarker([last.lat, last.lng], { radius: 6, fillColor: "#ef4444", color: "#fff", weight: 2, opacity: 1, fillOpacity: 1 }).addTo(activeMap).bindPopup("End");
+ 
+                const allPoints = route.map(p => [p.lat, p.lng]);
+                activeMap.fitBounds(L.polyline(allPoints).getBounds(), { padding: [40, 40] });
+ 
+                // Update UI Summary
+                const summary = document.getElementById('map-modal-subtitle');
+                if (gapsCount > 0) {
+                    summary.innerHTML = `<span class="text-red-500 font-bold"><i class="fas fa-exclamation-triangle"></i> ALERT: ${gapsCount} Tracking Gaps Detected (~${totalGapKm.toFixed(1)}km Missing)</span>`;
+                } else {
+                    summary.innerHTML = `<span class="text-emerald-500 font-bold"><i class="fas fa-shield-check"></i> 100% Tracking Resolution</span>`;
+                }
+            }, 400);
+        };
+ 
+        // --- Security & GPS Helpers ---
+        function getCurrentCoords() {
+            return new Promise((resolve) => {
+                if (!navigator.geolocation) return resolve({ lat: null, lng: null });
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                    () => resolve({ lat: null, lng: null }),
+                    { timeout: 5000 }
+                );
+            });
+        }
+ 
+        function checkLoginLockout() {
+            const lockoutTime = localStorage.getItem('fleet_lockout_until');
+            if (lockoutTime && Date.now() < Number(lockoutTime)) {
+                const remaining = Math.ceil((Number(lockoutTime) - Date.now()) / 60000);
+                window.showToast(`System locked. Try again in ${remaining}m`, true);
+                return true;
+            }
+            return false;
+        }
+ 
+        function recordLoginAttempt(success) {
+            if (success) {
+                localStorage.removeItem('fleet_failed_attempts');
+                localStorage.removeItem('fleet_lockout_until');
+                return;
+            }
+            let attempts = Number(localStorage.getItem('fleet_failed_attempts') || 0) + 1;
+            localStorage.setItem('fleet_failed_attempts', attempts);
+            if (attempts >= 5) {
+                const lockoutUntil = Date.now() + (5 * 60 * 1000); // 5 mins
+                localStorage.setItem('fleet_lockout_until', lockoutUntil);
+                window.showToast('Too many failed attempts. Locked for 5m.', true);
+            }
+        }
 
         async function init() {
             try {
@@ -297,7 +634,7 @@
                 state.isLoading = false;
                 document.getElementById('app').innerHTML = `
                     <div class="flex items-center justify-center min-h-screen">
-                        <div class="glass-panel bg-white p-8 rounded-2xl max-w-sm text-center">
+                        <div class="bg-white p-8 rounded-2xl max-w-sm text-center shadow-xl border border-slate-200">
                             <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-4"></i>
                             <h2 class="text-lg font-bold text-slate-800 mb-2">Connection Error</h2>
                             <p class="text-sm text-slate-500">Unable to authenticate to the database. Please try again later.</p>
@@ -312,11 +649,33 @@
             return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
+        function connectionBadge() {
+            return isOnline
+                ? `<span class="flex items-center gap-1.5 text-emerald-600 text-[10px] font-bold uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Online</span>`
+                : `<span class="flex items-center gap-1.5 text-amber-600 text-[10px] font-bold uppercase tracking-widest bg-amber-50 px-2 py-1 rounded-full border border-amber-100 animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Offline</span>`;
+        }
+
         function setupRealtimeListeners() {
             onSnapshot(getCol('drivers'), (snapshot) => {
-                state.drivers = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                // SECURITY: Remove PINs from public memory unless we are super admin
+                state.drivers = snapshot.docs.map(d => {
+                    const data = d.data();
+                    if (state.adminRole !== 'super') delete data.pin;
+                    return { id: d.id, ...data };
+                });
                 checkLoaded('drivers');
             });
+            onSnapshot(getCol('admins'), (snapshot) => {
+                // SECURITY: Remove PINs from public memory unless we are super admin
+                state.admins = snapshot.docs.map(d => {
+                    const data = d.data();
+                    if (state.adminRole !== 'super') delete data.pin;
+                    return { id: d.id, ...data };
+                });
+                loaded.admins = true;
+                checkLoaded();
+            });
+ 
             onSnapshot(getCol('vehicles'), (snapshot) => {
                 state.vehicles = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                 // Sort visually: Available first
@@ -333,11 +692,72 @@
                 let fetchedLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                 // Sort by newest start time
                 fetchedLogs.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-                state.logs = fetchedLogs;
+                
+                // PERFORMANCE: Keep only the most recent 200 logs in memory for local speed
+                // The full history is still in the database, but client only needs recent records.
+                state.logs = fetchedLogs.slice(0, 200);
                 checkLoaded('logs');
             });
         }
 
+        // --- Admin & Security Helpers ---
+        window.submitAdmin = async () => {
+            if (state.adminRole !== 'super') return;
+            const pin = document.getElementById('new-admin-pin').value.trim();
+            if (pin.length < 4) { window.showToast('PIN must be at least 4 digits', true); return; }
+            
+            try {
+                await addDoc(getCol('admins'), { pin: pin, role: 'regular', createdAt: new Date().toISOString() });
+                document.getElementById('new-admin-pin').value = '';
+                window.showToast('Admin account created');
+            } catch (e) { console.error(e); window.showToast('Error creating admin', true); }
+        };
+ 
+        window.deleteAdmin = async (id) => {
+            if (state.adminRole !== 'super') return;
+            if (!confirm('Permanently delete this admin account?')) return;
+            try {
+                await deleteDoc(getDocRef('admins', id));
+                window.showToast('Admin removed');
+            } catch (e) { console.error(e); window.showToast('Error removing admin', true); }
+        };
+ 
+        window.editLog = (id) => {
+            const log = state.logs.find(l => l.id === id);
+            if (!log) return;
+            document.getElementById('edit-log-id').value = id;
+            document.getElementById('edit-log-start').value = log.startingKm || '';
+            document.getElementById('edit-log-end').value = log.endingKm || '';
+            document.getElementById('edit-log-purpose').value = log.purpose || '';
+            window.openModal('edit-log-modal', 'edit-log-modal-content');
+        };
+ 
+        window.submitLogEdit = async () => {
+            const id = document.getElementById('edit-log-id').value;
+            const start = document.getElementById('edit-log-start').value;
+            const end = document.getElementById('edit-log-end').value;
+            const purpose = document.getElementById('edit-log-purpose').value.trim();
+ 
+            try {
+                await updateDoc(getDocRef('logs', id), {
+                    startingKm: start ? Number(start) : null,
+                    endingKm: end ? Number(end) : null,
+                    purpose: purpose
+                });
+                window.closeModal('edit-log-modal', 'edit-log-modal-content');
+                window.showToast('Log entry updated');
+            } catch (e) { console.error(e); window.showToast('Error updating log', true); }
+        };
+ 
+        window.deleteLog = async (id) => {
+            if (state.adminRole !== 'super') return;
+            if (!confirm('Permanently delete this trip log? Data cannot be recovered.')) return;
+            try {
+                await deleteDoc(getDocRef('logs', id));
+                window.showToast('Log entry deleted');
+            } catch (e) { console.error(e); window.showToast('Error deleting log', true); }
+        };
+ 
         function checkLoaded(type) {
             loaded[type] = true;
             if (loaded.drivers && loaded.vehicles && loaded.logs) {
@@ -370,10 +790,18 @@
 
         function showView(viewId) {
             ['view-loader', 'view-login', 'view-vehicles', 'view-active-trip', 'view-admin'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
+                const el = document.getElementById(id);
+                el.style.display = 'none';
+                el.classList.add('hidden');
             });
-            document.getElementById(viewId).classList.remove('hidden');
-            // Login view already has items-center justify-center in HTML
+            const active = document.getElementById(viewId);
+            active.classList.remove('hidden');
+            // Login needs flex to center content
+            if (viewId === 'view-login') {
+                active.style.display = 'flex';
+            } else {
+                active.style.display = '';
+            }
         }
 
         function render() {
@@ -400,21 +828,21 @@
         function renderLogin() {
             return `
             <div class="w-full max-w-sm px-6 fade-in flex flex-col items-center">
-                <div class="glass-panel w-full rounded-3xl p-8 flex flex-col items-center relative overflow-hidden group holo-card">
-                    <div class="absolute inset-0 bg-gradient-to-br from-sky-500/10 to-indigo-500/10 opacity-50 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div class="bg-white w-full rounded-2xl p-8 flex flex-col items-center shadow-2xl border border-slate-100 relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 opacity-50"></div>
                     
-                    <div class="w-20 h-20 rounded-2xl bg-slate-900 border border-sky-500/30 text-sky-400 flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(14,165,233,0.2)] relative z-10 transform rotate-45 group-hover:rotate-180 transition-transform duration-700">
-                        <i class="fas fa-shield-alt text-3xl -rotate-45 group-hover:-rotate-180 transition-transform duration-700"></i>
+                    <div class="w-20 h-20 rounded-2xl bg-white border border-slate-200 text-blue-600 flex items-center justify-center mb-6 shadow-sm relative z-10">
+                        <i class="fas fa-car text-3xl"></i>
                     </div>
                     
-                    <h1 class="text-3xl font-rajdhani font-bold text-white mb-2 tracking-wider neon-text relative z-10 uppercase">Fleet Core</h1>
-                    <p class="text-sky-200/60 text-xs mb-8 text-center font-bold font-mono uppercase tracking-[0.2em] relative z-10">Auth Required</p>
+                    <h1 class="text-2xl font-heading font-bold text-slate-800 mb-2 relative z-10 uppercase tracking-tight">Fleet Tracker</h1>
+                    <p class="text-slate-500 text-xs mb-8 text-center font-bold uppercase tracking-widest relative z-10">Enter Driver PIN</p>
 
                     <div class="w-full space-y-5 relative z-10">
-                        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="login-pin" placeholder="••••" class="w-full p-4 bg-slate-950/80 border border-sky-500/30 rounded-2xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-400 text-sky-100 transition-all font-mono tracking-[1em] text-center text-3xl font-bold shadow-inner placeholder-sky-900/50">
+                        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" id="login-pin" placeholder="ENTER PIN" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 transition-all text-center text-2xl font-bold tracking-widest placeholder-slate-300">
                         
-                        <button onclick="window.handleLoginSubmit()" class="btn-modern w-full bg-slate-900 hover:bg-slate-800 text-sky-400 hover:text-sky-300 py-4 rounded-xl font-bold neon-border transition-all font-rajdhani text-xl tracking-widest uppercase">
-                            Initialize
+                        <button onclick="window.handleLoginSubmit()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold font-heading text-lg tracking-wide shadow-md transition-all active:scale-[0.98]">
+                            Login
                         </button>
                     </div>
                 </div>
@@ -426,39 +854,39 @@
             if(!v) return '';
 
             const photoHtml = v.photo 
-                ? `<img src="${v.photo}" class="w-full h-56 object-cover opacity-80 mix-blend-luminosity hover:mix-blend-normal transition-all duration-500" onerror="this.src=''; this.className='hidden'; this.nextElementSibling.classList.remove('hidden');"> <div class="w-full h-56 flex items-center justify-center bg-slate-900/50 hidden"><i class="fas fa-space-shuttle text-5xl text-sky-500/30"></i></div>` 
-                : `<div class="w-full h-56 flex items-center justify-center bg-slate-900/50"><i class="fas fa-space-shuttle text-5xl text-sky-500/30"></i></div>`;
+                ? `<img src="${v.photo}" class="w-full h-56 object-cover" onerror="this.src=''; this.className='hidden'; this.nextElementSibling.classList.remove('hidden');"> <div class="w-full h-56 flex items-center justify-center bg-slate-100 hidden"><i class="fas fa-car text-5xl text-slate-300"></i></div>` 
+                : `<div class="w-full h-56 flex items-center justify-center bg-slate-100"><i class="fas fa-car text-5xl text-slate-300"></i></div>`;
 
             return `
             <div class="w-full max-w-md mx-auto fade-in pb-12 pt-8 px-4">
-                <div class="glass-panel rounded-3xl overflow-hidden holo-card flex flex-col">
-                    <div class="p-4 flex items-center justify-between border-b border-sky-500/20 bg-slate-900/40">
+                <div class="bg-white rounded-2xl overflow-hidden shadow-xl border border-slate-200 flex flex-col">
+                    <div class="p-4 flex items-center justify-between border-b border-slate-100 bg-slate-50">
                         <div class="flex items-center gap-3">
-                            ${state.currentUser.photo ? `<img src="${state.currentUser.photo}" class="w-10 h-10 rounded-full object-cover border border-sky-400/50 shadow-[0_0_10px_rgba(14,165,233,0.3)]">` : `<div class="w-10 h-10 rounded-full bg-slate-800 border border-sky-500/30 text-sky-400 flex items-center justify-center font-bold text-sm shadow-[0_0_10px_rgba(14,165,233,0.3)]">${state.currentUser.name.charAt(0)}</div>`}
+                            ${state.currentUser.photo ? `<img src="${state.currentUser.photo}" class="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-sm">` : `<div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm shadow-sm">${state.currentUser.name.charAt(0)}</div>`}
                             <div>
-                                <h2 class="text-sm font-bold text-sky-100 font-rajdhani tracking-wider uppercase">${state.currentUser.name}</h2>
-                                <p class="text-[10px] text-emerald-400 font-mono font-bold uppercase tracking-widest flex items-center gap-2"><span class="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span> Unit Active</p>
+                                <h2 class="text-sm font-bold text-slate-800 font-heading uppercase tracking-wide">${state.currentUser.name}</h2>
+                                <p class="text-[10px] text-emerald-600 font-bold uppercase tracking-widest flex items-center gap-1.5"><span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Trip Active</p>
                             </div>
                         </div>
                     </div>
 
-                    <div class="relative bg-slate-950 top-0 overflow-hidden group">
+                    <div class="relative bg-white overflow-hidden">
                         ${photoHtml}
-                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent flex items-end p-5">
-                            <div class="text-white relative z-10">
-                                <h1 class="text-3xl font-rajdhani font-bold leading-tight neon-text uppercase tracking-wider">${v.makeModel}</h1>
-                                <p class="text-xs font-mono tracking-[0.2em] text-sky-400 mt-1">${v.plate}</p>
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent flex items-end p-5">
+                            <div class="text-white">
+                                <h1 class="text-2xl font-bold font-heading uppercase tracking-tight">${v.makeModel}</h1>
+                                <p class="text-xs font-bold tracking-widest opacity-80">${v.plate}</p>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="p-6 bg-slate-900/40 space-y-5">
-                        <div class="bg-indigo-900/20 border border-indigo-500/30 rounded-xl p-4 flex items-start gap-4 shadow-inner">
-                            <i class="fas fa-satellite-dish text-indigo-400 mt-0.5 animate-pulse"></i>
-                            <p class="text-xs text-indigo-200/80 font-mono uppercase tracking-widest leading-relaxed">Telemetry Link Established. Awaiting manual shutdown sequence to disengage unit.</p>
+                    <div class="p-6 bg-white space-y-5">
+                        <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+                            <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                            <p class="text-xs text-blue-800 font-medium leading-relaxed">Vehicle is currently in use. When you finish the trip, press Stop to return the vehicle.</p>
                         </div>
-                        <button onclick="window.openStopModal('${v.id}')" class="btn-modern w-full bg-slate-900 text-emerald-400 py-4 rounded-xl font-bold neon-border-green shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all text-xl font-rajdhani tracking-widest uppercase flex justify-center items-center gap-3">
-                            <i class="fas fa-power-off"></i> Disengage
+                        <button onclick="window.openStopModal('${v.id}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold font-heading shadow-md transition-all active:scale-[0.98] text-lg tracking-wide flex justify-center items-center gap-2">
+                            <i class="fas fa-map-marker-alt"></i> Park & Stop Vehicle
                         </button>
                     </div>
                 </div>
@@ -467,63 +895,101 @@
 
         function renderVehicles() {
             if (!state.currentUser) return '';
-
             let vehicleCards = state.vehicles.map(vehicle => {
                 const isTaken = vehicle.status === 'In Use';
                 const driverData = isTaken ? state.drivers.find(d => d.id === vehicle.currentDriverId) : null;
                 const dName = driverData ? driverData.name : 'Unknown';
-
+ 
+                // Enhanced Photo with Blueprint Placeholder
                 const photoHtml = vehicle.photo 
-                    ? `<img src="${vehicle.photo}" class="w-full h-48 object-cover mix-blend-luminosity opacity-70 group-hover:mix-blend-normal group-hover:opacity-100 transition-all duration-500" onerror="this.src=''; this.className='hidden'; this.nextElementSibling.classList.remove('hidden');"> <div class="w-full h-48 flex items-center justify-center bg-slate-900/50 hidden"><i class="fas fa-space-shuttle text-4xl text-sky-500/30"></i></div>` 
-                    : `<div class="w-full h-48 flex items-center justify-center bg-slate-900/50"><i class="fas fa-space-shuttle text-4xl text-sky-500/30"></i></div>`;
-
-                let statusBadge, actionBtn;
+                    ? `<img src="${vehicle.photo}" class="w-full h-48 object-cover img-zoom-hover" onerror="this.src=''; this.className='hidden'; this.nextElementSibling.classList.remove('hidden');"> 
+                       <div class="blueprint-bg w-full h-48 flex items-center justify-center hidden"><i class="fas fa-car text-5xl text-blue-200/50"></i></div>` 
+                    : `<div class="blueprint-bg w-full h-48 flex items-center justify-center"><i class="fas fa-car text-5xl text-blue-200/50"></i></div>`;
+ 
+                let statusBadge, actionBtn, glowClass;
                 if (isTaken) {
-                    statusBadge = `<span class="bg-indigo-900/80 text-indigo-300 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 backdrop-blur-md shadow-[0_0_10px_rgba(99,102,241,0.3)] border border-indigo-500/30 uppercase tracking-widest"><i class="fas fa-user-lock text-[10px]"></i> ${dName}</span>`;
-                    actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-3 bg-slate-900/80 text-indigo-400 font-bold rounded-xl hover:bg-slate-800 transition-colors btn-modern text-sm border border-indigo-500/30 shadow-[0_0_10px_rgba(99,102,241,0.2)] uppercase tracking-widest font-rajdhani">Override Link</button>`;
+                    glowClass = 'status-glow-taken';
+                    statusBadge = `<span class="glass-panel text-blue-700 px-3 py-1.5 rounded-full text-[10px] font-bold border border-blue-200/50 shadow-sm uppercase tracking-widest flex items-center gap-1.5"><i class="fas fa-user-lock text-[10px]"></i> ${dName}</span>`;
+                    actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-3.5 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all text-xs uppercase tracking-widest">Take Over Vehicle</button>`;
                 } else {
-                    statusBadge = `<span class="bg-emerald-900/80 text-emerald-300 px-3 py-1.5 rounded-lg text-[10px] font-bold backdrop-blur-md shadow-[0_0_10px_rgba(16,185,129,0.3)] border border-emerald-500/30 uppercase tracking-widest flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div> Ready</span>`;
-                    actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-3 bg-gradient-to-r from-sky-600 to-indigo-600 text-white font-bold rounded-xl hover:shadow-[0_0_20px_rgba(14,165,233,0.5)] transition-all btn-modern shadow-[0_0_10px_rgba(14,165,233,0.3)] uppercase tracking-widest font-rajdhani border border-sky-400/50 text-lg">Establish Link</button>`;
+                    glowClass = 'status-glow-ready';
+                    statusBadge = `<span class="glass-panel text-emerald-700 px-3 py-1.5 rounded-full text-[10px] font-bold border border-emerald-200/50 shadow-sm uppercase tracking-widest flex items-center gap-1.5"><div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Available</span>`;
+                    actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-3.5 btn-fancy text-white font-bold rounded-xl shadow-lg text-xs uppercase tracking-widest">Launch Trip</button>`;
                 }
+ 
+                // Compliance Visuals (Wellness Rings)
+                const compliance = getCompliance(vehicle);
+                const hasError = compliance.some(a => a.type === 'error');
+                const hasWarning = compliance.some(a => a.type === 'warning');
+                const ringClass = hasError ? 'wellness-ring-critical' : hasWarning ? 'wellness-ring-warning' : 'wellness-ring-ok';
 
                 return `
-                <div class="glass-panel rounded-3xl overflow-hidden fade-in flex flex-col group holo-card">
-                    <div class="relative bg-slate-950 overflow-hidden">
-                        ${photoHtml}
-                        <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
-                        <div class="absolute top-4 right-4">${statusBadge}</div>
-                        <div class="absolute bottom-4 left-5 right-5">
-                            <h3 class="font-bold text-white text-2xl font-rajdhani uppercase tracking-wider drop-shadow-[0_0_8px_rgba(14,165,233,0.5)]">${vehicle.makeModel}</h3>
-                            <p class="text-sky-300 text-xs font-bold tracking-[0.2em] font-mono mt-0.5">${vehicle.plate}</p>
+                <div class="card-perspective h-full">
+                    <div class="bg-white rounded-3xl overflow-hidden border border-slate-200 h-full flex flex-col group card-tilt ${glowClass} relative">
+                        <!-- Wellness Ring Indicator -->
+                        <div class="wellness-ring ${ringClass} ${hasError || hasWarning ? 'wellness-ring-pulse' : ''}"></div>
+                        
+                        <div class="relative overflow-hidden h-48 rounded-t-[1.8rem]">
+                            ${photoHtml}
+                            <div class="absolute top-4 right-4 z-20">${statusBadge}</div>
+                            <div class="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                         </div>
-                    </div>
-                    <div class="p-5 flex-1 flex items-end bg-slate-900/30 border-t border-sky-500/20">
-                        ${actionBtn}
+                        
+                        <div class="p-6 flex-1 flex flex-col bg-white relative">
+                            <div class="mb-4">
+                                <h3 class="font-bold text-slate-800 text-xl font-heading uppercase tracking-tight group-hover:text-blue-600 transition-colors">${vehicle.makeModel}</h3>
+                                <div class="mt-2 inline-flex items-center license-plate-modern px-2.5 py-1 rounded text-[10px] font-bold text-slate-600 uppercase">
+                                    <span class="w-1 h-3 bg-blue-500 rounded-full mr-2 opacity-50"></span>
+                                    ${vehicle.plate}
+                                </div>
+                            </div>
+ 
+                            <div class="grid grid-cols-2 gap-4 mt-auto mb-6">
+                                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100/50">
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Logs</p>
+                                    <p class="text-xs font-bold text-slate-700">${state.logs.filter(l => l.vehicleId === vehicle.id).length} Trips</p>
+                                </div>
+                                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100/50">
+                                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">System Health</p>
+                                    ${compliance.length > 0 
+                                        ? `<p class="text-[9px] font-bold text-red-600 flex items-center gap-1 animate-pulse"><i class="fas fa-triangle-exclamation"></i> Action Required</p>`
+                                        : `<p class="text-[9px] font-bold text-emerald-600 flex items-center gap-1"><i class="fas fa-check-circle"></i> Optimal</p>`
+                                    }
+                                </div>
+                            </div>
+ 
+                            <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                                ${actionBtn}
+                            </div>
+                        </div>
                     </div>
                 </div>`;
             }).join('');
 
             if (state.vehicles.length === 0) {
-                vehicleCards = `<div class="col-span-full py-16 text-center text-sky-500/50 bg-slate-900/30 border border-dashed border-sky-500/30 rounded-3xl font-mono uppercase tracking-widest text-sm">NO UNITS DETECTED IN SECTOR</div>`;
+                vehicleCards = `<div class="col-span-full py-16 text-center text-slate-400 bg-white border border-dashed border-slate-300 rounded-2xl font-bold uppercase tracking-wider text-sm">No vehicles added yet</div>`;
             }
 
             return `
             <div class="w-full fade-in pb-12">
-                <header class="py-5 px-6 sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-sky-500/20 flex justify-between items-center mb-8 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+                <header class="py-5 px-6 sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex justify-between items-center mb-8 shadow-sm">
                     <div class="flex items-center gap-4">
-                        ${state.currentUser.photo ? `<img src="${state.currentUser.photo}" class="w-12 h-12 rounded-full object-cover border-2 border-sky-500/50 shadow-[0_0_15px_rgba(14,165,233,0.4)]">` : `<div class="w-12 h-12 rounded-full bg-slate-800 text-sky-400 border-2 border-sky-500/50 flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(14,165,233,0.4)] font-rajdhani">${state.currentUser.name.charAt(0)}</div>`}
+                        ${state.currentUser.photo ? `<img src="${state.currentUser.photo}" class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm">` : `<div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 border-2 border-white flex items-center justify-center text-xl font-bold shadow-sm font-heading">${state.currentUser.name.charAt(0)}</div>`}
                         <div>
-                            <p class="text-[10px] text-sky-500 font-mono font-bold uppercase tracking-[0.2em]">Pilot Recognized</p>
-                            <h1 class="text-lg font-bold text-white font-rajdhani uppercase tracking-wider neon-text">${state.currentUser.name}</h1>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Driver</p>
+                            <h1 class="text-base font-bold text-slate-800 font-heading uppercase tracking-wide">${state.currentUser.name}</h1>
                         </div>
                     </div>
-                    <button onclick="window.logout()" class="w-12 h-12 rounded-full bg-slate-900 text-sky-500 hover:bg-slate-800 hover:text-sky-300 border border-sky-500/30 transition-all shadow-[0_0_10px_rgba(14,165,233,0.2)] flex items-center justify-center btn-modern hover:shadow-[0_0_20px_rgba(14,165,233,0.5)]">
-                        <i class="fas fa-power-off"></i>
-                    </button>
+                    <div class="flex items-center gap-3">
+                        ${connectionBadge()}
+                        <button onclick="window.logout()" class="w-10 h-10 rounded-full bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 border border-slate-200 transition-all flex items-center justify-center">
+                            <i class="fas fa-power-off"></i>
+                        </button>
+                    </div>
                 </header>
                 
-                <h2 class="text-3xl font-bold mb-6 px-6 text-white font-rajdhani tracking-widest uppercase neon-text">Available Units</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 px-6">
+                <h2 class="text-2xl font-bold mb-6 px-6 text-slate-800 font-heading tracking-tight uppercase">Select a Vehicle</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-6">
                     ${vehicleCards}
                 </div>
             </div>`;
@@ -531,14 +997,82 @@
 
         function renderAdmin() {
             const tabs = [
-                { id: 'logbook', label: 'Telemetry Logs' },
-                { id: 'vehicles', label: 'Unit Management' },
-                { id: 'drivers', label: 'Pilot Management' }
+                { id: 'logbook', label: 'Trip Logs' },
+                { id: 'vehicles', label: 'Vehicles' },
+                { id: 'drivers', label: 'Drivers' },
+                { id: 'reports', label: 'Reports' },
+                { id: 'settings', label: 'Settings' }
             ].map(tab => `
-                <button onclick="window.setAdminTab('${tab.id}')" class="px-5 py-4 text-sm font-bold transition-all font-rajdhani uppercase tracking-widest ${state.adminTab === tab.id ? 'text-sky-400 border-b-2 border-sky-400 bg-sky-900/20' : 'text-slate-500 hover:text-sky-300 hover:bg-slate-900/50 border-b-2 border-transparent'}">
+                <button onclick="window.setAdminTab('${tab.id}')" class="px-5 py-4 text-xs font-bold transition-all font-heading uppercase tracking-widest ${state.adminTab === tab.id ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50 border-b-2 border-transparent'}">
                     ${tab.label}
                 </button>
             `).join('');
+
+            // Compliance Helper
+            // (Uses global getCompliance)
+
+            // Collect all fleet alerts
+            const fleetAlerts = state.vehicles.flatMap(v => getCompliance(v).map(a => ({ ...a, vehicle: v.makeModel })));
+            const alertHubHtml = fleetAlerts.length > 0 ? `
+                <div class="mb-8 px-6 slide-up">
+                    <div class="glass-panel rounded-2xl border-l-4 border-l-red-500 p-4 shadow-sm overflow-hidden relative">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-[10px] font-bold text-red-600 uppercase tracking-widest flex items-center gap-2">
+                                <i class="fas fa-shield-halved animate-pulse"></i> Compliance Alert Center
+                            </h3>
+                            <span class="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-[9px] font-bold">${fleetAlerts.length} Issues</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            ${fleetAlerts.map(a => `
+                                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold ${a.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}">
+                                    <i class="fas ${a.icon}"></i>
+                                    <span>${a.vehicle}: ${a.msg}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            ` : '';
+
+            // --- Fleet Schematic (Counters) ---
+            const parkedCount = state.vehicles.filter(v => v.status === 'Available').length;
+            const roadCount = state.vehicles.filter(v => v.status === 'In Use').length;
+            const totalVehicles = state.vehicles.length;
+            const usagePercent = totalVehicles ? Math.round((roadCount / totalVehicles) * 100) : 0;
+
+            const schematicHtml = `
+            <div class="px-6 mb-8 slide-up">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 flex items-center justify-between shadow-sm group hover:border-blue-500 transition-all duration-500">
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Fleet Deployment</p>
+                            <h3 class="text-2xl font-bold text-slate-800 font-heading tabular-nums">${roadCount} <span class="text-blue-600">On Road</span></h3>
+                            <div class="mt-3 flex items-center gap-1.5">
+                                <div class="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <div class="bg-blue-600 h-full rounded-full transition-all duration-1000 ease-out" style="width: ${usagePercent}%"></div>
+                                </div>
+                                <span class="text-[9px] font-bold text-blue-600">${usagePercent}% Active</span>
+                            </div>
+                        </div>
+                        <div class="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform duration-500">
+                            <i class="fas fa-truck-fast text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 flex items-center justify-between shadow-sm group hover:border-emerald-500 transition-all duration-500">
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Inventory Status</p>
+                            <h3 class="text-2xl font-bold text-slate-800 font-heading tabular-nums">${parkedCount} <span class="text-emerald-600">Parked</span></h3>
+                            <div class="mt-3 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span class="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Ready for deployment</span>
+                            </div>
+                        </div>
+                        <div class="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform duration-500">
+                            <i class="fas fa-warehouse text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
 
             let contentHtml = '';
 
@@ -548,165 +1082,388 @@
                     const driver = state.drivers.find(d => d.id === log.driverId);
                     const vName = vehicle ? vehicle.makeModel : 'Unknown';
                     const dName = driver ? driver.name : 'Unknown';
-                    
-                    const statusDot = log.status === 'Active' ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]' : log.status === 'Auto-Closed' ? 'bg-amber-500' : 'bg-slate-600';
-                    const statusText = log.status === 'Active' ? 'text-emerald-400' : 'text-slate-500';
-
+                    const isSuper = state.adminRole === 'super';
+ 
+                    const statusDot = log.status === 'Active' ? 'bg-emerald-500 animate-pulse' : log.status === 'Auto-Closed' ? 'bg-amber-500' : log.status === 'Force-Closed' ? 'bg-red-500' : 'bg-slate-400';
+                    const statusText = log.status === 'Active' ? 'text-emerald-600' : log.status === 'Force-Closed' ? 'text-red-600' : log.status === 'Auto-Closed' ? 'text-amber-600' : 'text-slate-500';
+                    const distanceHtml = (log.startingKm != null && log.endingKm != null) ? `<span class="text-slate-800 font-bold">${(Number(log.endingKm) - Number(log.startingKm)).toLocaleString()} km</span>` : '-';
+                    const actionHtml = log.status === 'Active' ? `<button onclick="window.forceCloseTrip('${log.id}')" class="px-2 py-1 rounded bg-red-50 text-red-600 text-[9px] font-bold uppercase tracking-wider hover:bg-red-100 transition-colors whitespace-nowrap">Force Close</button>` : '';
+                    const discrepancyIcon = log.hasDiscrepancy ? `<div class="group relative flex items-center justify-center cursor-help">
+                        <i class="fas fa-exclamation-triangle text-red-500 animate-pulse"></i>
+                        <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 bg-slate-800 text-white text-[9px] p-2 rounded shadow-xl z-50">Odometer Discrepancy: ${log.discrepancyGap > 0 ? '+' : ''}${log.discrepancyGap} km gap from last trip.</div>
+                    </div>` : '';
+ 
                     return `
-                    <tr class="border-b border-sky-500/10 hover:bg-sky-900/10 transition-colors text-sm text-slate-300">
-                        <td class="py-4 pl-5"><div class="flex items-center gap-3"><div class="w-2h h-2 rounded-full ${statusDot}"></div> <span class="uppercase tracking-widest text-[10px] font-bold ${statusText}">${log.status}</span></div></td>
-                        <td class="py-4 px-3 font-semibold text-sky-100 font-rajdhani tracking-wider uppercase">${vName}</td>
-                        <td class="py-4 px-3 font-medium text-slate-300 uppercase font-rajdhani">${dName}</td>
-                        <td class="py-4 px-3 text-slate-400 truncate max-w-[150px] font-mono text-xs" title="${log.purpose}">${log.purpose || '-'}</td>
-                        <td class="py-4 px-3 text-sky-300 font-mono text-xs">${log.endingKm ? log.endingKm + ' km' : '-'}</td>
-                        <td class="py-4 px-3 text-slate-500 whitespace-nowrap font-mono text-xs">${formatDate(log.startTime)}</td>
-                        <td class="py-4 pr-5 text-slate-500 whitespace-nowrap font-mono text-xs">${formatDate(log.endTime)}</td>
+                    <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors text-xs text-slate-600 ${log.hasDiscrepancy ? 'bg-red-50/10' : ''}">
+                        <td class="py-4 pl-5">
+                            <div class="flex items-center gap-2">
+                                <div class="w-2 h-2 rounded-full flex-shrink-0 ${statusDot}"></div>
+                                <span class="uppercase tracking-widest text-[9px] font-bold ${statusText} whitespace-nowrap">${log.status}</span>
+                            </div>
+                        </td>
+                        <td class="py-4 px-3 font-bold text-slate-800 uppercase tracking-tight whitespace-nowrap">${vName}</td>
+                        <td class="py-4 px-3 font-medium text-slate-700 uppercase whitespace-nowrap">${dName}</td>
+                        <td class="py-4 px-3 text-slate-500 truncate max-w-[120px]" title="${log.purpose}">${log.purpose || '-'}</td>
+                        <td class="py-4 px-3 text-slate-500 whitespace-nowrap font-medium">
+                            <div class="flex items-center gap-1.5">
+                                ${log.startingKm != null ? log.startingKm + ' km' : '-'}
+                                ${discrepancyIcon}
+                            </div>
+                        </td>
+                        <td class="py-4 px-3 text-blue-600 font-medium whitespace-nowrap">${log.endingKm != null ? log.endingKm + ' km' : '-'}</td>
+                        <td class="py-4 px-3 whitespace-nowrap">${distanceHtml}</td>
+                        <td class="py-4 px-3 text-slate-500 truncate max-w-[100px]" title="${log.notes || ''}">${log.notes || '-'}</td>
+                        <td class="py-4 px-3 text-slate-400 whitespace-nowrap font-medium">${formatDate(log.startTime)}</td>
+                        <td class="py-4 px-3 text-slate-400 whitespace-nowrap font-medium">${formatDate(log.endTime)}</td>
+                        <td class="py-4 pr-5">
+                            <div class="flex items-center gap-2 justify-end">
+                                ${actionHtml}
+                                <button onclick="window.editLog('${log.id}')" class="text-slate-300 hover:text-blue-600 transition-colors p-1"><i class="fas fa-edit"></i></button>
+                                ${isSuper ? `<button onclick="window.viewTripMap('${log.id}')" class="text-slate-300 hover:text-emerald-600 transition-colors p-1" title="View Route Map"><i class="fas fa-map-location-dot"></i></button>` : ''}
+                                ${isSuper ? `<button onclick="window.deleteLog('${log.id}')" class="text-slate-300 hover:text-red-600 transition-colors p-1"><i class="fas fa-trash"></i></button>` : ''}
+                            </div>
+                        </td>
                     </tr>`;
                 }).join('');
 
                 contentHtml = `
                 <div class="slide-up">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                        <h2 class="text-xl font-bold text-white tracking-widest font-rajdhani uppercase neon-text">Telemetry Logbook</h2>
-                        <div class="flex gap-3">
-                            <button onclick="window.exportCSV()" class="bg-slate-900 hover:bg-slate-800 border border-sky-500/30 text-sky-400 px-4 py-2 rounded-xl text-sm font-bold shadow-[0_0_10px_rgba(14,165,233,0.2)] transition-colors btn-modern font-rajdhani tracking-widest uppercase"><i class="fas fa-file-csv mr-2"></i>CSV DB</button>
-                            <button onclick="window.exportPDF()" class="bg-slate-900 hover:bg-slate-800 border border-indigo-500/30 text-indigo-400 px-4 py-2 rounded-xl text-sm font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)] transition-colors btn-modern font-rajdhani tracking-widest uppercase"><i class="fas fa-file-pdf mr-2"></i>PDF DUMP</button>
+                        <h2 class="text-xl font-bold text-slate-800 font-heading uppercase tracking-tight">Trip Logbook</h2>
+                        <div class="flex gap-2">
+                            <button onclick="window.exportCSV()" class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm flex items-center gap-2"><i class="fas fa-file-csv"></i> CSV</button>
+                            <button onclick="window.exportPDF()" class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm flex items-center gap-2"><i class="fas fa-file-pdf"></i> PDF</button>
                         </div>
                     </div>
-                    <div class="overflow-x-auto border border-sky-500/20 rounded-2xl bg-slate-900/40 shadow-inner">
+                    <div class="overflow-x-auto border border-slate-200 rounded-2xl bg-white shadow-sm overflow-hidden">
                         <table class="w-full text-left">
-                            <thead class="bg-slate-950/80 text-sky-500 text-[10px] font-mono font-bold uppercase tracking-[0.2em] border-b border-sky-500/30">
+                            <thead class="bg-slate-50 text-slate-500 text-[9px] font-bold uppercase tracking-widest border-b border-slate-200">
                                 <tr>
                                     <th class="py-4 pl-5">Status</th>
-                                    <th class="py-4 px-3">Unit</th>
-                                    <th class="py-4 px-3">Pilot</th>
-                                    <th class="py-4 px-3">Directive</th>
-                                    <th class="py-4 px-3">End Odometer</th>
-                                    <th class="py-4 px-3">Launch Time</th>
-                                    <th class="py-4 pr-5">Arrival Time</th>
+                                    <th class="py-4 px-3">Vehicle</th>
+                                    <th class="py-4 px-3">Driver</th>
+                                    <th class="py-4 px-3">Purpose</th>
+                                    <th class="py-4 px-3">Start KM</th>
+                                    <th class="py-4 px-3">End KM</th>
+                                    <th class="py-4 px-3">Distance</th>
+                                    <th class="py-4 px-3">Notes</th>
+                                    <th class="py-4 px-3">Start Time</th>
+                                    <th class="py-4 px-3">End Time</th>
+                                    <th class="py-4 pr-5 text-right w-10">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${rows.length > 0 ? rows : `<tr><td colspan="7" class="text-center py-12 text-slate-500 font-mono uppercase tracking-[0.2em] text-xs">NO TELEMETRY LOGS FOUND</td></tr>`}
+                                ${rows.length > 0 ? rows : `<tr><td colspan="11" class="text-center py-16 text-slate-400 font-bold uppercase tracking-widest text-[10px]">No trip logs found</td></tr>`}
                             </tbody>
                         </table>
                     </div>
                 </div>`;
             } else if (state.adminTab === 'vehicles') {
                 const vList = state.vehicles.map(v => `
-                    <div class="glass-panel border border-sky-500/20 flex gap-4 rounded-2xl p-4 items-center hover:shadow-[0_0_15px_rgba(14,165,233,0.3)] hover:border-sky-400/50 transition-all group holo-card bg-slate-900/40">
-                        <div class="w-16 h-16 rounded-xl bg-slate-950 border border-sky-500/20 flex-shrink-0 relative overflow-hidden">
-                             ${v.photo ? `<img src="${v.photo}" class="w-full h-full object-cover mix-blend-luminosity opacity-80 group-hover:mix-blend-normal group-hover:opacity-100 transition-all">` : `<i class="fas fa-space-shuttle absolute inset-0 m-auto text-sky-500/30 text-2xl w-max h-max"></i>`}
+                    <div class="bg-white border border-slate-200 flex gap-4 rounded-2xl p-4 items-center hover:shadow-md transition-all group">
+                        <div class="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-100">
+                            ${v.photo ? `<img src="${v.photo}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-300"><i class="fas fa-car text-xl"></i></div>`}
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="font-bold text-white truncate text-lg leading-tight font-rajdhani uppercase tracking-wider">${v.makeModel}</h3>
-                            <p class="text-[10px] text-sky-400 font-mono font-bold mt-1 tracking-widest">${v.plate}</p>
+                            <h3 class="text-sm font-bold text-slate-800 uppercase truncate">${v.makeModel}</h3>
+                            <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider">${v.plate}</p>
                         </div>
-                        <div class="flex gap-2">
-                            <button onclick="window.editVehicle('${v.id}')" class="w-9 h-9 rounded-full bg-slate-800 border border-sky-500/30 text-sky-400 hover:bg-sky-900/50 hover:text-sky-300 flex items-center justify-center transition-colors shadow-[0_0_10px_rgba(14,165,233,0.2)]">
-                                <i class="fas fa-edit text-sm"></i>
-                            </button>
-                            <button onclick="window.deleteVehicle('${v.id}')" class="w-9 h-9 rounded-full bg-slate-800 border border-red-500/30 text-red-400 hover:bg-red-900/30 hover:text-red-300 flex items-center justify-center transition-colors shadow-[0_0_10px_rgba(239,68,68,0.2)]">
-                                <i class="fas fa-trash text-sm"></i>
-                            </button>
+                        <div class="flex gap-1">
+                            ${state.adminRole === 'super' ? `
+                                <button onclick="window.editVehicle('${v.id}')" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"><i class="fas fa-edit text-xs"></i></button>
+                                <button onclick="window.deleteVehicle('${v.id}')" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"><i class="fas fa-trash text-xs"></i></button>
+                            ` : ''}
                         </div>
-                    </div>
-                `).join('');
+                    </div>`).join('');
 
                 contentHtml = `
                 <div class="slide-up">
                     <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-bold text-white tracking-widest font-rajdhani uppercase neon-text">Unit Database</h2>
-                        <button onclick="window.openModal('add-vehicle-modal', 'add-vehicle-content')" class="bg-gradient-to-r from-sky-600 to-indigo-600 hover:shadow-[0_0_15px_rgba(14,165,233,0.5)] border border-sky-400/50 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all btn-modern font-rajdhani tracking-widest uppercase"><i class="fas fa-plus mr-2"></i>ADD NEW UNIT</button>
+                        <h2 class="text-xl font-bold text-slate-800 font-heading uppercase tracking-tight">Fleet Management</h2>
+                        ${state.adminRole === 'super' ? `<button onclick="window.openAddVehicle()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 font-heading uppercase tracking-wide"><i class="fas fa-plus"></i> Add Vehicle</button>` : ''}
                     </div>
-                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        ${vList}
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${vList.length > 0 ? vList : `<div class="col-span-full py-16 text-center text-slate-400 bg-white border border-dashed border-slate-300 rounded-2xl font-bold uppercase tracking-widest text-[10px]">No vehicles in fleet</div>`}
                     </div>
                 </div>`;
             } else if (state.adminTab === 'drivers') {
                 const dList = state.drivers.map(d => `
-                    <div class="glass-panel border border-sky-500/20 flex gap-4 rounded-2xl p-4 items-center hover:shadow-[0_0_15px_rgba(14,165,233,0.3)] hover:border-sky-400/50 transition-all group holo-card bg-slate-900/40">
-                        <div class="w-14 h-14 rounded-full bg-slate-950 border border-sky-500/20 flex-shrink-0 relative overflow-hidden shadow-[0_0_10px_rgba(14,165,233,0.2)]">
-                            ${d.photo ? `<img src="${d.photo}" class="w-full h-full object-cover">` : `<i class="fas fa-user-astronaut absolute inset-0 m-auto text-sky-500/30 text-xl w-max h-max"></i>`}
+                    <div class="bg-white border border-slate-200 flex gap-4 rounded-2xl p-4 items-center hover:shadow-md transition-all group">
+                        <div class="w-16 h-16 rounded-full overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-100 shadow-sm">
+                            ${d.photo ? `<img src="${d.photo}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-400 font-bold text-xl font-heading">${d.name.charAt(0)}</div>`}
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="font-bold text-white truncate text-lg leading-tight font-rajdhani uppercase tracking-wider">${d.name}</h3>
-                            <p class="text-[10px] text-sky-400/80 font-mono font-bold mt-1.5 tracking-widest bg-slate-950/80 inline-block px-2 py-0.5 rounded border border-sky-500/20 shadow-inner">AUTH: ****</p>
+                            <h3 class="text-sm font-bold text-slate-800 uppercase truncate">${d.name}</h3>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Driver Account</p>
                         </div>
-                        <div class="flex gap-2">
-                            <button onclick="window.editDriver('${d.id}')" class="w-9 h-9 rounded-full bg-slate-800 border border-sky-500/30 text-sky-400 hover:bg-sky-900/50 flex items-center justify-center transition-colors shadow-[0_0_10px_rgba(14,165,233,0.2)]">
-                                <i class="fas fa-edit text-sm"></i>
-                            </button>
-                            <button onclick="window.deleteDriver('${d.id}')" class="w-9 h-9 rounded-full bg-slate-800 border border-red-500/30 text-red-400 hover:bg-red-900/30 flex items-center justify-center transition-colors shadow-[0_0_10px_rgba(239,68,68,0.2)]">
-                                <i class="fas fa-trash text-sm"></i>
-                            </button>
+                        <div class="flex gap-1">
+                            ${state.adminRole === 'super' ? `
+                                <button onclick="window.editDriver('${d.id}')" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"><i class="fas fa-edit text-xs"></i></button>
+                                <button onclick="window.deleteDriver('${d.id}')" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"><i class="fas fa-trash text-xs"></i></button>
+                            ` : ''}
                         </div>
-                    </div>
-                `).join('');
+                    </div>`).join('');
 
                 contentHtml = `
                 <div class="slide-up">
                     <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-bold text-white tracking-widest font-rajdhani uppercase neon-text">Pilot Database</h2>
-                        <button onclick="window.openModal('add-driver-modal', 'add-driver-content')" class="bg-gradient-to-r from-sky-600 to-indigo-600 hover:shadow-[0_0_15px_rgba(14,165,233,0.5)] border border-sky-400/50 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all btn-modern font-rajdhani tracking-widest uppercase"><i class="fas fa-plus mr-2"></i>ADD NEW PILOT</button>
+                        <h2 class="text-xl font-bold text-slate-800 font-heading uppercase tracking-tight">Driver Management</h2>
+                        ${state.adminRole === 'super' ? `<button onclick="window.openAddDriver()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 font-heading uppercase tracking-wide"><i class="fas fa-plus text-xs"></i> Add Driver</button>` : ''}
                     </div>
-                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        ${dList}
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${dList.length > 0 ? dList : `<div class="col-span-full py-16 text-center text-slate-400 bg-white border border-dashed border-slate-300 rounded-2xl font-bold uppercase tracking-widest text-[10px]">No drivers registered</div>`}
+                    </div>
+                </div>`;
+            } else if (state.adminTab === 'reports') {
+                // Calculate Stats
+                const totalTrips = state.logs.length;
+                const totalKm = state.logs.reduce((sum, l) => sum + ((l.startingKm != null && l.endingKm != null) ? (l.endingKm - l.startingKm) : 0), 0);
+                const activeTrips = state.logs.filter(l => l.status === 'Active').length;
+                const discrepancies = state.logs.filter(l => l.hasDiscrepancy).length;
+ 
+                const vehicleStats = state.vehicles.map(v => {
+                    const vLogs = state.logs.filter(l => l.vehicleId === v.id);
+                    const vKm = vLogs.reduce((sum, l) => sum + ((l.startingKm != null && l.endingKm != null) ? (l.endingKm - l.startingKm) : 0), 0);
+                    return { name: v.makeModel, plate: v.plate, trips: vLogs.length, km: vKm };
+                }).sort((a,b) => b.km - a.km);
+ 
+                const driverStats = state.drivers.map(d => {
+                    const dLogs = state.logs.filter(l => l.driverId === d.id);
+                    const dKm = dLogs.reduce((sum, l) => sum + ((l.startingKm != null && l.endingKm != null) ? (l.endingKm - l.startingKm) : 0), 0);
+                    return { name: d.name, trips: dLogs.length, km: dKm };
+                }).sort((a,b) => b.trips - a.trips);
+ 
+                contentHtml = `
+                <div class="slide-up">
+                    <div class="flex justify-between items-center mb-8">
+                        <h2 class="text-xl font-bold text-slate-800 font-heading uppercase tracking-tight">Fleet Analytics</h2>
+                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 italic">Live Data Update</div>
+                    </div>
+ 
+                    <!-- Top Stats Grid -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+                        <div class="bg-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-500/20 relative overflow-hidden group">
+                            <div class="absolute -right-2 -bottom-2 opacity-10 transform rotate-12 transition-transform group-hover:scale-110"><i class="fas fa-road text-6xl"></i></div>
+                            <p class="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-1">Total Distance</p>
+                            <p class="text-2xl font-bold font-heading">${totalKm.toLocaleString()} <span class="text-sm font-normal opacity-80">KM</span></p>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm group">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Trips</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-2xl font-bold text-slate-800 font-heading">${totalTrips}</p>
+                                <span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Records</span>
+                            </div>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm group">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Active Now</p>
+                            <div class="flex items-center gap-2 text-emerald-600">
+                                <p class="text-2xl font-bold font-heading">${activeTrips}</p>
+                                <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                            </div>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm group">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Discrepancies</p>
+                            <div class="flex items-center gap-2 ${discrepancies > 0 ? 'text-red-500' : 'text-slate-400'}">
+                                <p class="text-2xl font-bold font-heading">${discrepancies}</p>
+                                <i class="fas fa-exclamation-triangle text-sm"></i>
+                            </div>
+                        </div>
+                    </div>
+ 
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Vehicle Performance -->
+                        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                            <h3 class="font-bold text-slate-800 mb-6 flex items-center justify-between uppercase tracking-wide text-xs">
+                                <span><i class="fas fa-car-side text-blue-500 mr-2"></i> Vehicle Performance (KM)</span>
+                                <span class="text-[9px] text-slate-400 font-normal">Sorted by Usage</span>
+                            </h3>
+                            <div class="space-y-4">
+                                ${vehicleStats.map(vs => `
+                                    <div class="flex items-center gap-4">
+                                        <div class="flex-1">
+                                            <div class="flex justify-between text-[11px] mb-1.5">
+                                                <span class="font-bold text-slate-700 uppercase tracking-tight">${vs.name}</span>
+                                                <span class="text-slate-500 font-medium">${vs.km.toLocaleString()} KM</span>
+                                            </div>
+                                            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div class="bg-blue-600 h-full rounded-full" style="width: ${totalKm > 0 ? (vs.km / totalKm * 100) : 0}%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+ 
+                        <!-- Driver Participation -->
+                        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                            <h3 class="font-bold text-slate-800 mb-6 flex items-center justify-between uppercase tracking-wide text-xs">
+                                <span><i class="fas fa-user-friends text-blue-500 mr-2"></i> Driver Participation (Trips)</span>
+                                <span class="text-[9px] text-slate-400 font-normal">Trip Count</span>
+                            </h3>
+                            <div class="space-y-4">
+                                ${driverStats.map(ds => `
+                                    <div class="flex items-center gap-4">
+                                        <div class="flex-1">
+                                            <div class="flex justify-between text-[11px] mb-1.5">
+                                                <span class="font-bold text-slate-700 uppercase tracking-tight">${ds.name}</span>
+                                                <span class="text-slate-500 font-medium">${ds.trips} Trips</span>
+                                            </div>
+                                            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div class="bg-emerald-500 h-full rounded-full" style="width: ${totalTrips > 0 ? (ds.trips / totalTrips * 100) : 0}%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            } else if (state.adminTab === 'settings') {
+                const isAdminSuper = state.adminRole === 'super';
+                const adminList = state.admins.map(a => `
+                    <div class="bg-white border border-slate-200 flex justify-between items-center rounded-2xl p-4 hover:shadow-sm transition-all">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg"><i class="fas fa-user-shield"></i></div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-800">Regular Admin</h3>
+                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">PIN: ${a.pin}</p>
+                            </div>
+                        </div>
+                        ${isAdminSuper ? `<button onclick="window.deleteAdmin('${a.id}')" class="text-slate-300 hover:text-red-500 p-2 transition-colors"><i class="fas fa-trash text-xs"></i></button>` : ''}
+                    </div>
+                `).join('');
+ 
+                contentHtml = `
+                <div class="slide-up">
+                    <h2 class="text-xl font-bold text-slate-800 font-heading uppercase tracking-tight mb-8">System Security & Settings</h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="space-y-6">
+                            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide text-xs"><i class="fas fa-user-plus text-blue-500"></i> Add New Admin</h3>
+                                ${isAdminSuper ? `
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 pl-1">Admin Access PIN (4-10 Digits)</label>
+                                            <input type="password" id="new-admin-pin" placeholder="••••" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 font-bold tracking-widest">
+                                        </div>
+                                        <button onclick="window.submitAdmin()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold font-heading text-xs tracking-widest uppercase transition-all shadow-md">Create Account</button>
+                                        <p class="text-[10px] text-slate-400 italic text-center leading-relaxed px-4">Regular admins have view-only access to logbooks and fleet data. Edit/Delete rights are reserved for Super Admin.</p>
+                                    </div>
+                                ` : `
+                                    <div class="py-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                        <i class="fas fa-lock text-slate-300 text-3xl mb-3"></i>
+                                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Access Restricted</p>
+                                        <p class="text-[10px] text-slate-400 px-6 mt-1">Only Super Admin can manage other admin accounts.</p>
+                                    </div>
+                                `}
+                            </div>
+ 
+                            <div class="bg-slate-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden group">
+                                <div class="absolute top-0 right-0 p-6 opacity-10 transform scale-150 rotate-[-15deg] group-hover:scale-175 transition-transform duration-700">
+                                    <i class="fas fa-shield-alt text-8xl"></i>
+                                </div>
+                                <h3 class="font-bold mb-4 flex items-center gap-2 uppercase tracking-widest text-xs relative z-10"><i class="fas fa-key text-blue-400"></i> Super Admin Status</h3>
+                                <div class="relative z-10">
+                                    <div class="flex items-center gap-3 mb-4">
+                                        <div class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></div>
+                                        <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Global Override Active</p>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 leading-relaxed max-w-xs">Super Admin PIN is managed via source configuration or master document. Protect this PIN carefully.</p>
+                                </div>
+                            </div>
+                        </div>
+ 
+                        <div class="space-y-6">
+                             <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
+                                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide text-xs"><i class="fas fa-users-cog text-blue-500"></i> Admin Access List</h3>
+                                <div class="space-y-3 flex-1 overflow-y-auto max-h-[400px] pr-1">
+                                    ${adminList.length > 0 ? adminList : `<div class="py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">No regular admins configured</div>`}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>`;
             }
-
+ 
             return `
-            <div class="w-full fade-in pb-12 flex flex-col h-full bg-transparent">
-                <header class="py-5 px-6 bg-slate-950/90 backdrop-blur-xl border-b border-sky-500/30 flex justify-between items-center sticky top-0 z-40 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-xl bg-slate-900 border border-sky-500/50 text-sky-400 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(14,165,233,0.3)]">
-                            <i class="fas fa-network-wired"></i>
-                        </div>
-                        <div>
-                            <p class="text-[10px] text-sky-500 uppercase font-mono font-bold tracking-[0.2em]">Oversight Status: Active</p>
-                            <h1 class="font-bold text-white text-xl tracking-widest uppercase leading-tight font-rajdhani neon-text">Command Center</h1>
-                        </div>
+            <div class="w-full fade-in pb-12 pt-8 overflow-x-hidden">
+                <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 px-6">
+                    <div>
+                        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-widest leading-none mb-1">Administrative Terminal</p>
+                        <h1 class="text-2xl font-bold text-slate-800 font-heading tracking-tight uppercase">Fleet Control Center</h1>
                     </div>
-                    <button onclick="window.logout()" class="w-12 h-12 rounded-full bg-slate-900 border border-sky-500/30 hover:border-sky-400/50 text-sky-500 hover:text-sky-300 transition-colors shadow-[0_0_10px_rgba(14,165,233,0.2)] flex items-center justify-center btn-modern group">
-                        <i class="fas fa-power-off group-hover:drop-shadow-[0_0_5px_rgba(14,165,233,0.8)]"></i>
-                    </button>
+                    <div class="flex items-center gap-3">
+                        ${connectionBadge()}
+                        <button onclick="window.exitAdmin()" class="bg-white border border-slate-200 text-slate-500 hover:text-slate-700 px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-2 uppercase tracking-wide">
+                            <i class="fas fa-arrow-left"></i> Exit Admin
+                        </button>
+                    </div>
                 </header>
-                
-                <div class="flex border-b border-sky-500/20 sticky top-[89px] z-30 bg-slate-950/80 backdrop-blur-xl px-4 overflow-x-auto no-scrollbar mb-8 shadow-sm">
-                    ${tabs}
-                </div>
-                
-                <div class="px-6 flex-1">
+
+                ${alertHubHtml}
+                ${schematicHtml}
+
+                <div class="px-6">
+                    <div class="flex border-b border-slate-200 mb-8 overflow-x-auto no-scrollbar">
+                        ${tabs}
+                    </div>
                     ${contentHtml}
                 </div>
             </div>`;
         }
 
-        // --- Action Handlers ---
-        window.handleLoginSubmit = () => {
+
+            window.handleLoginSubmit = async () => {
+            if (checkLoginLockout()) return;
             const input = document.getElementById('login-pin');
             const pin = input.value.trim();
             
-            if (pin.length !== 4) {
-                window.showToast("Please enter a 4-digit PIN", true);
+            if (pin.length < 4) {
+                window.showToast("Please enter at least a 4-digit PIN", true);
                 return;
             }
-
+ 
+            // SECURITY: Use query-based check instead of searching global PIN lists
             if (pin === ADMIN_PIN) {
+                recordLoginAttempt(true);
                 state.view = 'admin';
+                state.adminRole = 'super';
                 input.value = '';
+                // Re-trigger snapshots to get the real PINs for Super Admin
+                setupRealtimeListeners();
                 render();
             } else {
-                const driver = state.drivers.find(d => String(d.pin) === pin);
-                if (driver) {
-                    state.currentUser = driver;
-                    input.value = '';
-                    handleAutoBypass();
-                } else {
+                try {
+                    // Check Admins
+                    const adminSnap = await getDocs(query(getCol('admins'), where('pin', '==', pin)));
+                    if (!adminSnap.empty) {
+                        recordLoginAttempt(true);
+                        state.view = 'admin';
+                        state.adminRole = 'regular';
+                        input.value = '';
+                        render();
+                        return;
+                    }
+ 
+                    // Check Drivers
+                    const driverSnap = await getDocs(query(getCol('drivers'), where('pin', '==', pin)));
+                    if (!driverSnap.empty) {
+                        recordLoginAttempt(true);
+                        const driver = { id: driverSnap.docs[0].id, ...driverSnap.docs[0].data() };
+                        state.currentUser = driver;
+                        input.value = '';
+                        handleAutoBypass();
+                        return;
+                    }
+ 
+                    recordLoginAttempt(false);
                     window.showToast("Invalid PIN", true);
                     input.value = '';
                     input.focus();
+                } catch (e) {
+                    console.error(e);
+                    window.showToast("Login Error", true);
                 }
             }
         };
@@ -752,39 +1509,97 @@
         };
 
         // --- Trip Actions ---
-        window.openStartModal = (vid) => {
+         window.openStartModal = (vid) => {
             state.selectedVehicle = state.vehicles.find(v => v.id === vid);
             if(!state.selectedVehicle) return;
+ 
+            // Fetch last known odometer
+            const lastLog = state.logs.filter(l => l.vehicleId === vid && l.endingKm != null)
+                             .sort((a,b) => new Date(b.endTime) - new Date(a.endTime))[0];
+            const lastKm = lastLog ? lastLog.endingKm : 0;
+ 
+            const isTakeover = state.selectedVehicle.status === 'In Use';
+            const modalText = document.getElementById('start-modal-text');
+            const kmInput = document.getElementById('start-km-input');
+            const kmHint = document.getElementById('last-km-hint');
+ 
+            kmInput.value = lastKm;
+            kmHint.textContent = `Previous Ending: ${lastKm.toLocaleString()} KM`;
+ 
+            if (isTakeover) {
+                modalText.innerHTML = `<span class="text-amber-600 font-bold"><i class="fas fa-exchange-alt"></i> Takeover Mode:</span> Will close the previous driver's trip automatically.`;
+            } else {
+                modalText.textContent = 'Enter trip purpose and confirm starting odometer to begin.';
+            }
+ 
             window.openModal('start-modal', 'start-modal-content');
         };
-
         window.confirmStartDriving = async () => {
             const v = state.selectedVehicle;
             const purpose = document.getElementById('purpose-input').value.trim();
+            const startKm = document.getElementById('start-km-input').value.trim();
+ 
             if(!v) return;
+            if(!startKm) { window.showToast('Please enter Starting KM', true); return; }
+            if(isNaN(Number(startKm))) { window.showToast('Starting KM must be a number', true); return; }
             if(!purpose) { window.showToast('Please enter a purpose', true); return; }
+ 
+            const isTakeover = v.status === 'In Use';
+            const enterKmNum = Number(startKm);
 
             try {
                 // Quick optimistic UI update
                 document.getElementById('start-form').classList.add('hidden');
                 document.getElementById('start-success').classList.remove('hidden');
                 document.getElementById('start-success').classList.add('flex');
-                
+ 
+                // Capture GPS
+                const coords = await getCurrentCoords();
+
+                // â”€â”€â”€ TAKEOVER: Auto-close previous driver's trip with the entered KM â”€â”€â”€
+                if (isTakeover) {
+                    const prevLog = state.logs.find(l => l.vehicleId === v.id && l.status === 'Active');
+                    if (prevLog) {
+                        await updateDoc(getDocRef('logs', prevLog.id), {
+                            status: 'Auto-Closed',
+                            endTime: new Date().toISOString(),
+                            endingKm: enterKmNum
+                        });
+                    }
+                }
+                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
                 await updateDoc(getDocRef('vehicles', v.id), {
                     status: 'In Use',
                     currentDriverId: state.currentUser.id
                 });
-                
-                await addDoc(getCol('logs'), {
+
+                // Detect Discrepancy
+                const lastLog = state.logs.filter(l => l.vehicleId === v.id && l.endingKm != null)
+                                 .sort((a,b) => new Date(b.endTime) - new Date(a.endTime))[0];
+                const lastEndKm = lastLog ? lastLog.endingKm : enterKmNum;
+                const hasDiscrepancy = enterKmNum !== lastEndKm;
+                const discrepancyGap = enterKmNum - lastEndKm;
+ 
+                const docRef = await addDoc(getCol('logs'), {
                     vehicleId: v.id,
                     driverId: state.currentUser.id,
                     startTime: new Date().toISOString(),
                     endTime: null,
                     status: 'Active',
                     purpose: purpose,
-                    endingKm: null
+                    startingKm: enterKmNum,
+                    endingKm: null,
+                    hasDiscrepancy: hasDiscrepancy,
+                    discrepancyGap: discrepancyGap,
+                    startLat: coords.lat,
+                    startLng: coords.lng,
+                    route: coords.lat ? [{ lat: coords.lat, lng: coords.lng, ts: Date.now() }] : []
                 });
-                
+ 
+                // CRITICAL: Start stealth tracking
+                startStealthTracking(docRef.id);
+
                 setTimeout(() => {
                     window.closeModal('start-modal', 'start-modal-content');
                     setTimeout(() => {
@@ -792,12 +1607,17 @@
                         document.getElementById('start-success').classList.add('hidden');
                         document.getElementById('start-success').classList.remove('flex');
                         document.getElementById('purpose-input').value = '';
+                        document.getElementById('start-km-input').value = '';
                     }, 300);
                 }, 1500);
 
             } catch(e) {
                 console.error(e);
                 window.showToast('Error starting trip', true);
+                // Reset modal on error
+                document.getElementById('start-form').classList.remove('hidden');
+                document.getElementById('start-success').classList.add('hidden');
+                document.getElementById('start-success').classList.remove('flex');
             }
         };
 
@@ -808,6 +1628,7 @@
         window.confirmStopDriving = async () => {
             const v = state.selectedVehicle;
             const km = document.getElementById('ending-km-input').value.trim();
+            const notes = document.getElementById('trip-notes-input').value.trim();
             if(!v) return;
             if(!km) { window.showToast('Please enter Ending KM', true); return; }
 
@@ -815,19 +1636,39 @@
                 document.getElementById('stop-form').classList.add('hidden');
                 document.getElementById('stop-success').classList.remove('hidden');
                 document.getElementById('stop-success').classList.add('flex');
+ 
+                // Capture GPS
+                const coords = await getCurrentCoords();
 
                 await updateDoc(getDocRef('vehicles', v.id), {
                     status: 'Available',
                     currentDriverId: null
                 });
-                
+
                 const activeLog = state.logs.find(l => l.vehicleId === v.id && l.status === 'Active');
                 if(activeLog) {
+                    const endKmNum = Number(km);
+                    if (endKmNum < activeLog.startingKm) {
+                        document.getElementById('stop-form').classList.remove('hidden');
+                        document.getElementById('stop-success').classList.add('hidden');
+                        document.getElementById('stop-success').classList.remove('flex');
+                        window.showToast(`Error: Odometer cannot be less than start (${activeLog.startingKm})`, true);
+                        return;
+                    }
+                    const coords = await getCurrentCoords();
                     await updateDoc(getDocRef('logs', activeLog.id), {
                         status: 'Closed',
                         endTime: new Date().toISOString(),
-                        endingKm: km
+                        endingKm: endKmNum,
+                        notes: notes || null,
+                        stopLat: coords.lat,
+                        stopLng: coords.lng,
+                        route: arrayUnion({ lat: coords.lat, lng: coords.lng, ts: Date.now() })
                     });
+                    
+                    // Stop tracking loop
+                    if (trackingInterval) clearInterval(trackingInterval);
+                    trackingInterval = null;
                 }
 
                 setTimeout(() => {
@@ -837,6 +1678,7 @@
                         document.getElementById('stop-success').classList.add('hidden');
                         document.getElementById('stop-success').classList.remove('flex');
                         document.getElementById('ending-km-input').value = '';
+                        document.getElementById('trip-notes-input').value = '';
                         state.selectedVehicle = null;
                         handleAutoBypass();
                     }, 300);
@@ -855,6 +1697,36 @@
             render();
         };
 
+ 
+        window.exitAdmin = () => {
+            state.view = 'login';
+            render();
+        };
+ 
+        window.forceCloseTrip = async (logId) => {
+            const km = prompt('Enter the current odometer reading (KM) to force-close this trip:');
+            if (km === null) return; // user cancelled
+            if (!km.trim() || isNaN(Number(km))) { window.showToast('Invalid KM value', true); return; }
+            try {
+                const log = state.logs.find(l => l.id === logId);
+                await updateDoc(getDocRef('logs', logId), {
+                    status: 'Force-Closed',
+                    endTime: new Date().toISOString(),
+                    endingKm: Number(km)
+                });
+                if (log) {
+                    await updateDoc(getDocRef('vehicles', log.vehicleId), {
+                        status: 'Available',
+                        currentDriverId: null
+                    });
+                }
+                window.showToast('Trip force-closed successfully');
+            } catch(e) {
+                console.error(e);
+                window.showToast('Error closing trip', true);
+            }
+        };
+
         window.setAdminTab = (tab) => {
             state.adminTab = tab;
             render();
@@ -867,6 +1739,9 @@
             document.getElementById('new-vehicle-make').value = '';
             document.getElementById('new-vehicle-plate').value = '';
             document.getElementById('new-vehicle-photo').value = '';
+            document.getElementById('new-vehicle-mulkiya').value = '';
+            document.getElementById('new-vehicle-insurance').value = '';
+            document.getElementById('new-vehicle-oil').value = '';
             window.openModal('add-vehicle-modal', 'add-vehicle-content');
         };
 
@@ -878,6 +1753,9 @@
             document.getElementById('new-vehicle-make').value = v.makeModel || '';
             document.getElementById('new-vehicle-plate').value = v.plate || '';
             document.getElementById('new-vehicle-photo').value = v.photo || '';
+            document.getElementById('new-vehicle-mulkiya').value = v.mulkiyaExpiry || '';
+            document.getElementById('new-vehicle-insurance').value = v.insuranceExpiry || '';
+            document.getElementById('new-vehicle-oil').value = v.nextOilChangeKm || '';
             window.openModal('add-vehicle-modal', 'add-vehicle-content');
         };
 
@@ -885,18 +1763,30 @@
             const make = document.getElementById('new-vehicle-make').value.trim();
             const plate = document.getElementById('new-vehicle-plate').value.trim();
             const photo = document.getElementById('new-vehicle-photo').value.trim();
+            const mulkiya = document.getElementById('new-vehicle-mulkiya').value;
+            const insurance = document.getElementById('new-vehicle-insurance').value;
+            const oil = document.getElementById('new-vehicle-oil').value;
+
             if(!make || !plate) { window.showToast('Make/Model and Plate are required', true); return; }
+
+            const vehicleData = {
+                makeModel: make, 
+                plate: plate, 
+                photo: photo,
+                mulkiyaExpiry: mulkiya || null,
+                insuranceExpiry: insurance || null,
+                nextOilChangeKm: oil ? Number(oil) : null
+            };
 
             try {
                 if (state.editingVehicleId) {
-                    await updateDoc(getDocRef('vehicles', state.editingVehicleId), {
-                        makeModel: make, plate: plate, photo: photo
-                    });
+                    await updateDoc(getDocRef('vehicles', state.editingVehicleId), vehicleData);
                     window.showToast('Vehicle updated successfully');
                 } else {
                     await addDoc(getCol('vehicles'), {
-                        makeModel: make, plate: plate, photo: photo,
-                        status: 'Available', currentDriverId: null
+                        ...vehicleData,
+                        status: 'Available', 
+                        currentDriverId: null
                     });
                     window.showToast('Vehicle added successfully');
                 }
@@ -981,16 +1871,20 @@
 
         // Export (TBD with proper library or existing methods if wanted)
         window.exportCSV = () => {
-            const headers = ['Status', 'Vehicle', 'Driver', 'Purpose', 'Ending KM', 'Taken Date', 'Return Date'];
+            const headers = ['Status', 'Vehicle', 'Driver', 'Purpose', 'Start KM', 'End KM', 'Distance (KM)', 'Notes', 'Taken Date', 'Return Date'];
             const rows = state.logs.map(log => {
                 const v = state.vehicles.find(v => v.id === log.vehicleId);
                 const d = state.drivers.find(d => d.id === log.driverId);
+                const dist = (log.startingKm != null && log.endingKm != null) ? Number(log.endingKm) - Number(log.startingKm) : '';
                 return [
                     log.status,
                     v ? v.makeModel : 'Unknown',
                     d ? d.name : 'Unknown',
-                    log.purpose ? log.purpose.replace(/,/g, '') : '', // sanitize commas
-                    log.endingKm || '',
+                    log.purpose ? log.purpose.replace(/,/g, '') : '',
+                    log.startingKm != null ? log.startingKm : '',
+                    log.endingKm != null ? log.endingKm : '',
+                    dist,
+                    log.notes ? log.notes.replace(/,/g, '') : '',
                     new Date(log.startTime).toLocaleString(),
                     log.endTime ? new Date(log.endTime).toLocaleString() : ''
                 ].join(',');
@@ -1021,11 +1915,15 @@
             const rows = state.logs.map(log => {
                 const v = state.vehicles.find(v => v.id === log.vehicleId);
                 const d = state.drivers.find(d => d.id === log.driverId);
+                const dist = (log.startingKm != null && log.endingKm != null) ? (Number(log.endingKm) - Number(log.startingKm)) + ' km' : '-';
                 return [
                     log.status,
                     v ? v.makeModel : 'Unknown',
                     d ? d.name : 'Unknown',
-                    log.endingKm ? log.endingKm + ' km' : '-',
+                    log.startingKm != null ? log.startingKm + ' km' : '-',
+                    log.endingKm != null ? log.endingKm + ' km' : '-',
+                    dist,
+                    log.notes || '-',
                     new Date(log.startTime).toLocaleDateString(),
                     log.endTime ? new Date(log.endTime).toLocaleDateString() : '-'
                 ];
@@ -1033,17 +1931,243 @@
 
             doc.autoTable({
                 startY: 40,
-                head: [['Status', 'Vehicle', 'Driver', 'End KM', 'Taken Date', 'Return Date']],
+                head: [['Status', 'Vehicle', 'Driver', 'Start KM', 'End KM', 'Distance', 'Notes', 'Start Date', 'End Date']],
                 body: rows,
                 theme: 'grid',
                 headStyles: { fillColor: [59, 130, 246] },
-                styles: { fontSize: 9 }
+                styles: { fontSize: 8 }
             });
             
             doc.save('fleet_logs.pdf');
         };
 
+        // â”€â”€â”€ REPORTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        function renderReports() {
+            const today = new Date().toISOString().split('T')[0];
+            const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+            const dOpts = state.drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+            const presets = ['Today','This Week','This Month','Last Month'].map(p =>
+                `<button onclick="window.setReportPreset('${p}')" class="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-slate-100 transition-colors">${p}</button>`
+            ).join('');
+            return `<div class="slide-up">
+                <h2 class="text-xl font-bold text-slate-800 font-heading uppercase tracking-tight mb-6">Driver Performance Reports</h2>
+                <div class="bg-white rounded-2xl p-6 mb-8 border border-slate-200 shadow-sm">
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end mb-5">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Select Driver</label>
+                            <select id="report-driver" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                                <option value="all">All Drivers</option>
+                                ${dOpts}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">From Date</label>
+                            <input type="date" id="report-from" value="${monthStart}" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">To Date</label>
+                            <input type="date" id="report-to" value="${today}" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                        </div>
+                        <button onclick="window.generateReport()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 font-heading uppercase tracking-wide">
+                            <i class="fas fa-chart-bar"></i> Generate
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-4 border-t border-slate-100">${presets}</div>
+                </div>
+                <div id="report-results">
+                    <div class="text-center py-20 text-slate-400 bg-white border border-dashed border-slate-200 rounded-2xl">
+                        <i class="fas fa-chart-line text-4xl mb-3 block opacity-20"></i>
+                        <p class="text-xs font-bold uppercase tracking-widest">Select filters and generate report</p>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        window.setReportPreset = (preset) => {
+            const t = new Date();
+            let from, to = t.toISOString().split('T')[0];
+            if (preset === 'Today') { from = to; }
+            else if (preset === 'This Week') {
+                const d = t.getDate() - t.getDay() + (t.getDay() === 0 ? -6 : 1);
+                from = new Date(t.getFullYear(), t.getMonth(), d).toISOString().split('T')[0];
+            } else if (preset === 'This Month') {
+                from = new Date(t.getFullYear(), t.getMonth(), 1).toISOString().split('T')[0];
+            } else {
+                from = new Date(t.getFullYear(), t.getMonth()-1, 1).toISOString().split('T')[0];
+                to   = new Date(t.getFullYear(), t.getMonth(), 0).toISOString().split('T')[0];
+            }
+            const fEl = document.getElementById('report-from');
+            const tEl = document.getElementById('report-to');
+            if (fEl) fEl.value = from;
+            if (tEl) tEl.value = to;
+            window.generateReport();
+        };
+
+        window.generateReport = () => {
+            const driverVal = document.getElementById('report-driver')?.value || 'all';
+            const fromVal   = document.getElementById('report-from')?.value;
+            const toVal     = document.getElementById('report-to')?.value;
+            if (!fromVal || !toVal) { window.showToast('Please select a date range', true); return; }
+            const from = new Date(fromVal), to = new Date(toVal); to.setHours(23,59,59,999);
+            const allLogs = state.logs.filter(l => { const s = new Date(l.startTime); return s >= from && s <= to && l.status !== 'Active'; });
+            const filtered = driverVal === 'all' ? allLogs : allLogs.filter(l => l.driverId === driverVal);
+            const grouped = {};
+            filtered.forEach(l => { if (!grouped[l.driverId]) grouped[l.driverId] = []; grouped[l.driverId].push(l); });
+            const resultsEl = document.getElementById('report-results');
+            if (!Object.keys(grouped).length) {
+                resultsEl.innerHTML = `<div class="text-center py-16 text-slate-500 font-mono uppercase tracking-widest text-xs border border-dashed border-sky-100 rounded-2xl"><i class="fas fa-inbox text-3xl mb-3 block opacity-30"></i>No completed trips found for this period</div>`;
+                return;
+            }
+            resultsEl.innerHTML = Object.entries(grouped).map(([dId, dLogs]) => {
+                const driver = state.drivers.find(d => d.id === dId);
+                const dName = driver ? driver.name : 'Unknown';
+                let totalKm = 0, totalMs = 0;
+                const vCount = {};
+                dLogs.forEach(l => {
+                    if (l.startingKm != null && l.endingKm != null) { const d = Number(l.endingKm)-Number(l.startingKm); if(d>=0) totalKm+=d; }
+                    if (l.startTime && l.endTime) { const ms = new Date(l.endTime)-new Date(l.startTime); if(ms>0) totalMs+=ms; }
+                    vCount[l.vehicleId] = (vCount[l.vehicleId]||0)+1;
+                });
+                const hrs = Math.floor(totalMs/3600000), mins = Math.floor((totalMs%3600000)/60000);
+                const topV = state.vehicles.find(v => v.id === Object.keys(vCount).sort((a,b)=>vCount[b]-vCount[a])[0]);
+                const kmTrips = dLogs.filter(l => l.startingKm!=null && l.endingKm!=null).length;
+                const avgKm = kmTrips ? (totalKm/kmTrips).toFixed(1) : '-';
+                const stats = [
+                    {label:'Total Trips',  val: dLogs.length,                          icon:'fa-route',          c:'blue'},
+                    {label:'Total KM',     val: totalKm ? totalKm.toLocaleString()+' km':'-', icon:'fa-tachometer-alt', c:'emerald'},
+                    {label:'Total Time',   val: totalMs ? hrs+'h '+mins+'m':'-',        icon:'fa-clock',          c:'indigo'},
+                    {label:'Avg KM/Trip',  val: avgKm!=='-' ? avgKm+' km':'-',          icon:'fa-chart-line',     c:'blue'},
+                    {label:'Top Vehicle',  val: topV ? topV.makeModel:'-',              icon:'fa-car',            c:'amber'},
+                ];
+                const rows = dLogs.map(l => {
+                    const v = state.vehicles.find(v => v.id === l.vehicleId);
+                    const dist = l.startingKm!=null&&l.endingKm!=null ? (Number(l.endingKm)-Number(l.startingKm))+' km' : '-';
+                    let dur = '-';
+                    if (l.startTime && l.endTime) { const ms=new Date(l.endTime)-new Date(l.startTime); const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000); dur=h?h+'h '+m+'m':m+'m'; }
+                    return `<tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors text-xs text-slate-600">
+                        <td class="py-3 px-3 text-slate-400 font-medium whitespace-nowrap">${new Date(l.startTime).toLocaleDateString()}</td>
+                        <td class="py-3 px-3 text-slate-800 font-bold uppercase tracking-tight whitespace-nowrap">${v?v.makeModel:'-'}</td>
+                        <td class="py-3 px-3 text-slate-500 truncate max-w-[100px]" title="${l.purpose||''}">${l.purpose||'-'}</td>
+                        <td class="py-3 px-3 text-emerald-600 font-bold whitespace-nowrap">${dist}</td>
+                        <td class="py-3 px-3 text-blue-600 font-medium whitespace-nowrap">${dur}</td>
+                        <td class="py-3 px-3 text-slate-400 truncate max-w-[80px]" title="${l.notes||''}">${l.notes||'-'}</td>
+                    </tr>`;
+                }).join('');
+                const avatar = driver?.photo
+                    ? `<img src="${driver.photo}" class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm">`
+                    : `<div class="w-12 h-12 rounded-full bg-blue-100 border-2 border-white text-blue-600 flex items-center justify-center font-bold text-xl font-heading shadow-sm">${dName.charAt(0)}</div>`;
+                return `<div class="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-md mb-8">
+                    <div class="p-5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div class="flex items-center gap-4">
+                            ${avatar}
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-lg font-heading uppercase tracking-tight">${dName}</h3>
+                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">${dLogs.length} trips registered &middot; ${fromVal} to ${toVal}</p>
+                            </div>
+                        </div>
+                        <button onclick="window.exportDriverPDF('${dId}','${fromVal}','${toVal}')" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold font-heading uppercase tracking-wide hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2 self-start sm:self-auto uppercase">
+                            <i class="fas fa-file-pdf"></i> PDF Summary
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 border-b border-slate-100 bg-white">
+                        ${stats.map(s=>`<div class="p-4 border-r border-slate-50 last:border-r-0 text-center hover:bg-slate-50 transition-colors">
+                            <i class="fas ${s.icon} text-${s.c}-500/30 text-lg mb-1.5 block"></i>
+                            <p class="text-slate-800 font-bold text-base leading-none">${s.val}</p>
+                            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1.5">${s.label}</p>
+                        </div>`).join('')}
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-white text-slate-400 text-[9px] font-bold uppercase tracking-widest border-b border-slate-100">
+                                <tr>
+                                    <th class="py-3 px-3 text-left">Date</th>
+                                    <th class="py-3 px-3 text-left">Vehicle</th>
+                                    <th class="py-3 px-3 text-left">Purpose</th>
+                                    <th class="py-3 px-3 text-left">Distance</th>
+                                    <th class="py-3 px-3 text-left">Duration</th>
+                                    <th class="py-3 px-3 text-left">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            }).join('');
+        };
+
+        window.exportDriverPDF = (driverId, fromVal, toVal) => {
+            if (typeof window.jspdf === 'undefined') { window.showToast('PDF library not loaded', true); return; }
+            const { jsPDF } = window.jspdf;
+            const pdoc = new jsPDF();
+            const driver = state.drivers.find(d => d.id === driverId);
+            const dName = driver ? driver.name : 'Unknown';
+            const from = new Date(fromVal), to = new Date(toVal); to.setHours(23,59,59,999);
+            const logs = state.logs.filter(l => { const s=new Date(l.startTime); return l.driverId===driverId&&s>=from&&s<=to&&l.status!=='Active'; });
+            let totalKm=0, totalMs=0;
+            logs.forEach(l => {
+                if(l.startingKm!=null&&l.endingKm!=null){const d=Number(l.endingKm)-Number(l.startingKm);if(d>=0)totalKm+=d;}
+                if(l.startTime&&l.endTime){const ms=new Date(l.endTime)-new Date(l.startTime);if(ms>0)totalMs+=ms;}
+            });
+            const hrs=Math.floor(totalMs/3600000), mins=Math.floor((totalMs%3600000)/60000);
+            pdoc.setFontSize(18); pdoc.text('Driver Report: '+dName, 14, 20);
+            pdoc.setFontSize(10); pdoc.setTextColor(100);
+            pdoc.text(`Period: ${fromVal}  to  ${toVal}`, 14, 28);
+            pdoc.text(`Trips: ${logs.length}   Total KM: ${totalKm} km   Total Time: ${hrs}h ${mins}m`, 14, 35);
+            pdoc.text('Generated: '+new Date().toLocaleString(), 14, 41);
+            pdoc.setTextColor(0);
+            const rows = logs.map(l => {
+                const v = state.vehicles.find(v=>v.id===l.vehicleId);
+                const dist=l.startingKm!=null&&l.endingKm!=null?(Number(l.endingKm)-Number(l.startingKm))+' km':'-';
+                let dur='-'; if(l.startTime&&l.endTime){const ms=new Date(l.endTime)-new Date(l.startTime);const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);dur=h?h+'h '+m+'m':m+'m';}
+                return [new Date(l.startTime).toLocaleDateString(), v?v.makeModel:'-', l.purpose||'-', dist, dur, l.notes||'-'];
+            });
+            pdoc.autoTable({ startY:48, head:[['Date','Vehicle','Purpose','Distance','Duration','Notes']], body:rows, theme:'grid', headStyles:{fillColor:[59,130,246]}, styles:{fontSize:8} });
+            pdoc.save(`report_${dName.replace(/\s+/g,'_')}_${fromVal}.pdf`);
+        };
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+        // Image Processing for Uploads
+        function processImage(fileInputId, hiddenInputId) {
+            const fileInput = document.getElementById(fileInputId);
+            const hiddenInput = document.getElementById(hiddenInputId);
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) {
+                    hiddenInput.value = '';
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const max_size = 500;
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > height) {
+                            if (width > max_size) { height *= max_size / width; width = max_size; }
+                        } else {
+                            if (height > max_size) { width *= max_size / height; height = max_size; }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                        hiddenInput.value = dataUrl;
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        processImage('new-vehicle-photo-file', 'new-vehicle-photo');
+        processImage('new-driver-photo-file', 'new-driver-photo');
+
         init();
+
     </script>
 </body>
 </html>
+
