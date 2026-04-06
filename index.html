@@ -1587,7 +1587,8 @@
                 // 3. Update Vehicle Status
                 await updateDoc(getDocRef('vehicles', v.id), {
                     status: 'In Use',
-                    currentDriverId: state.currentUser.id
+                    currentDriverId: state.currentUser.id,
+                    activeLogId: logId // Store the ID directly for easy retrieval
                 });
 
                 // 4. Create the New Log with a PERSISTENT ID (so we can update it offline later)
@@ -1608,10 +1609,10 @@
                 });
 
                 // --- OPTIMISTIC UI: Update local state immediately for instant feedback ---
-                const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
                 if (vIdx > -1) {
                     state.vehicles[vIdx].status = 'In Use';
                     state.vehicles[vIdx].currentDriverId = state.currentUser.id;
+                    state.vehicles[vIdx].activeLogId = logId;
                 }
                 
                 // Add a temporary local log with the REAL Firestore ID we just generated
@@ -1672,25 +1673,33 @@
                 document.getElementById('stop-success').classList.remove('hidden');
                 document.getElementById('stop-success').classList.add('flex');
 
-                // 1. Find the active log for this vehicle (Relaxed search for offline robustness)
-                const activeLogEntry = state.logs.find(log => 
-                    log.vehicleId === v.id && 
-                    log.status === 'Active'
-                );
+                // 1. Find the active log (Use the direct ID stored on the vehicle for 100% accuracy)
+                let activeLogEntry = state.logs.find(log => log.id === v.activeLogId);
                 
-                if (!activeLogEntry) throw "No active trip found for this vehicle.";
+                // Fallback: If not in local log array, try to find ANY active log for this vehicle
+                if (!activeLogEntry) {
+                    activeLogEntry = state.logs.find(log => log.vehicleId === v.id && log.status === 'Active');
+                }
                 
-                const activeLog = activeLogEntry;
-                const activeLogRef = getDocRef('logs', activeLog.id);
+                if (!activeLogEntry && !v.activeLogId) {
+                    throw "No active trip ID found for this vehicle. Try refreshing.";
+                }
 
-                if (endKmNum < activeLog.startingKm) {
-                    throw `Error: Odometer cannot be less than start (${activeLog.startingKm})`;
+                // If we STILL don't have the log object but we HAVE the ID, we can still proceed 
+                // by using the pre-calculated startingKm if available.
+                const activeLogId = activeLogEntry ? activeLogEntry.id : v.activeLogId;
+                const activeLogRef = getDocRef('logs', activeLogId);
+                const startingKm = activeLogEntry ? activeLogEntry.startingKm : (v.lastEndKm || 0);
+
+                if (endKmNum < startingKm) {
+                    throw `Error: Odometer cannot be less than start (${startingKm})`;
                 }
 
                 // 2. Update Vehicle Status
                 await updateDoc(getDocRef('vehicles', v.id), {
                     status: 'Available',
-                    currentDriverId: null
+                    currentDriverId: null,
+                    activeLogId: null // Clear the reference
                 });
 
                 // 3. Update Log
@@ -1698,7 +1707,7 @@
                     status: 'Closed',
                     endTime: new Date().toISOString(),
                     endingKm: endKmNum,
-                    notes: notes || (activeLog.notes || null)
+                    notes: notes || (activeLogEntry ? activeLogEntry.notes : null)
                 });
 
                 // --- OPTIMISTIC UI: Update local state immediately for instant feedback ---
