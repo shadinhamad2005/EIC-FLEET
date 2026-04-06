@@ -1,10 +1,10 @@
-const CACHE_NAME = 'fleet-tracker-v1';
+const CACHE_NAME = 'fleet-tracker-v2';
 const ASSETS_TO_CACHE = [
   './index.html',
   './manifest.json',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://cdn-icons-png.flaticon.com/512/3202/3202926.png',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap'
+  'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600&display=swap'
 ];
 
 // Install Event
@@ -32,20 +32,25 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  return self.clients.claim();
 });
 
-// Fetch Event (Network First, then Cache)
+// Fetch Event (Stale-While-Revalidate for robust offline)
 self.addEventListener('fetch', (event) => {
+  // Skip cross-origin requests for firestore and analytics
+  if (!event.request.url.startsWith(self.location.origin) && !event.request.url.includes('cdnjs.cloudflare.com')) {
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request)
-      .then((res) => {
-        // Reproduce the response and cache it
-        const resClone = res.clone();
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
         caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, resClone);
+          cache.put(event.request, networkResponse.clone());
         });
-        return res;
-      })
-      .catch(() => caches.match(event.request).then((res) => res))
+        return networkResponse;
+      });
+      return cachedResponse || fetchPromise;
+    })
   );
 });
