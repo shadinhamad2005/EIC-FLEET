@@ -687,28 +687,9 @@
         </div>
     </div>
 
-    <!-- Global Announcement Modal -->
-    <div id="broadcast-modal"
-        class="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[100] hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 relative border border-white/20"
-            id="broadcast-content">
-            <div class="p-8 text-center">
-                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
-                    <i class="fas fa-bullhorn text-2xl"></i>
-                </div>
-                <h3 class="text-xl font-bold text-slate-800 font-heading mb-4 uppercase tracking-tight">System Announcement</h3>
-                <div id="broadcast-message" class="text-lg sm:text-xl font-bold text-slate-700 mb-10 leading-snug tracking-tight"></div>
-                <button onclick="window.dismissBroadcast()"
-                    class="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold font-heading text-[10px] tracking-[0.3em] uppercase shadow-xl shadow-blue-500/20 transition-all active:scale-[0.98]">
-                    Got it, Continuos
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Toast -->
     <div id="toast"
-        class="fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3.5 rounded-full shadow-lg text-sm font-medium transition-all duration-300 opacity-0 -translate-y-4 z-[110] flex items-center justify-center pointer-events-none min-w-[280px]">
+        class="fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3.5 rounded-full shadow-lg text-sm font-medium transition-all duration-300 opacity-0 -translate-y-4 z-[100] flex items-center justify-center pointer-events-none min-w-[280px]">
     </div>
 
     <!-- Script -->
@@ -751,11 +732,7 @@
             editingDriverId: null,
             isLoading: true,
             isSyncing: false,
-            pendingWrites: 0,
-            settings: {
-                broadcastMessage: '',
-                broadcastId: 0
-            }
+            pendingWrites: 0
         };
 
         let loaded = { drivers: false, admins: false, vehicles: false, logs: false };
@@ -846,26 +823,20 @@
 
         async function init() {
             loadAppState();
-            render(); 
+            render(); // Instant UI recovery from local cache
 
+            // Start synchronization tasks immediately, even before (or if) auth finishes.
+            // This is key for offline-to-online background sync.
             setupRealtimeListeners();
-            setupConnectivityListeners();
-            setupVisibilityListeners();
 
             try {
+                // Trigger anonymous auth in the background
                 signInAnonymously(auth).catch(e => console.error("Offline Auth Warning:", e));
             } catch (error) {
                 console.error("Critical Auth Error:", error);
             }
 
-            // Fetch Global Settings (Announcements)
-            onSnapshot(getDocRef('settings', 'global'), (doc) => {
-                if (doc.exists()) {
-                    state.settings = doc.data();
-                    checkBroadcast();
-                }
-            });
-
+            // Set a safety timeout to hide the loading spinner if initialization takes too long
             setTimeout(() => {
                 if (state.isLoading) {
                     state.isLoading = false;
@@ -874,67 +845,10 @@
             }, 3000);
         }
 
-        function setupConnectivityListeners() {
-            window.addEventListener('online', () => { isOnline = true; render(); window.showToast('Connection restored — syncing data'); });
-            window.addEventListener('offline', () => { isOnline = false; render(); window.showToast('Offline mode — changes will sync when reconnected.', true); });
-        }
-
-        function setupVisibilityListeners() {
-            // Bullet Proof: Refresh data when app returns from background
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible' && !state.isLoading) {
-                    console.log("App foregrounded: Refreshing UI");
-                    render();
-                    checkBroadcast();
-                }
-            });
-        }
-
-        function checkBroadcast() {
-            if (!state.settings.broadcastMessage || !state.currentUser) return;
-            const lastId = localStorage.getItem('fleet_last_broadcast_id');
-            if (lastId !== String(state.settings.broadcastId)) {
-                document.getElementById('broadcast-message').textContent = state.settings.broadcastMessage;
-                window.openModal('broadcast-modal', 'broadcast-content');
-            }
-        }
-
-        window.dismissBroadcast = () => {
-            localStorage.setItem('fleet_last_broadcast_id', state.settings.broadcastId);
-            window.closeModal('broadcast-modal', 'broadcast-content');
-        };
-
         function formatDate(isoString) {
             if (!isoString) return '-';
             const date = new Date(isoString);
             return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-        }
-
-        function getCompliance(v) {
-            const alerts = [];
-            const today = new Date();
-            
-            if (v.mulkiyaExpiry) {
-                const mel = new Date(v.mulkiyaExpiry);
-                const diff = (mel - today) / (1000 * 3600 * 24);
-                if (diff < 0) alerts.push({ type: 'error', icon: 'fa-id-card', msg: 'Mulkiya Expired' });
-                else if (diff < 30) alerts.push({ type: 'warning', icon: 'fa-id-card', msg: `Mulkiya expires in ${Math.round(diff)} days` });
-            }
-
-            if (v.insuranceExpiry) {
-                const iel = new Date(v.insuranceExpiry);
-                const diff = (iel - today) / (1000 * 3600 * 24);
-                if (diff < 0) alerts.push({ type: 'error', icon: 'fa-shield-halved', msg: 'Insurance Expired' });
-                else if (diff < 30) alerts.push({ type: 'warning', icon: 'fa-shield-halved', msg: `Insurance expires in ${Math.round(diff)} days` });
-            }
-            
-            if (v.nextOilChangeKm && v.lastEndKm && v.lastEndKm >= v.nextOilChangeKm) {
-                alerts.push({ type: 'error', icon: 'fa-oil-can', msg: 'Oil Change Overdue' });
-            } else if (v.nextOilChangeKm && v.lastEndKm && (v.nextOilChangeKm - v.lastEndKm) < 500) {
-                alerts.push({ type: 'warning', icon: 'fa-oil-can', msg: `Oil Change in ${v.nextOilChangeKm - v.lastEndKm} km` });
-            }
-            
-            return alerts;
         }
 
         function connectionBadge() {
@@ -1286,7 +1200,7 @@
                         <div class="p-6 flex-1 flex flex-col bg-white relative">
                             <div class="mb-4">
                                 <h3 class="font-bold text-slate-800 text-xl font-heading uppercase tracking-tight group-hover:text-blue-600 transition-colors">${vehicle.makeModel}</h3>
-                                <div class="mt-2 inline-flex items-license-plate-modern px-2.5 py-1 rounded text-[10px] font-bold text-slate-600 uppercase">
+                                <div class="mt-2 inline-flex items-center license-plate-modern px-2.5 py-1 rounded text-[10px] font-bold text-slate-600 uppercase">
                                     <span class="w-1 h-3 bg-blue-500 rounded-full mr-2 opacity-50"></span>
                                     ${vehicle.plate}
                                 </div>
@@ -1361,6 +1275,10 @@
                 </button>
             `).join('');
 
+            // Compliance Helper
+            // (Uses global getCompliance)
+
+            // Collect all fleet alerts
             const fleetAlerts = state.vehicles.flatMap(v => getCompliance(v).map(a => ({ ...a, vehicle: v.makeModel })));
             const alertHubHtml = fleetAlerts.length > 0 ? `
                 <div class="mb-8 px-6 slide-up">
@@ -1383,6 +1301,7 @@
                 </div>
             ` : '';
 
+            // --- Fleet Schematic (Counters) ---
             const parkedCount = state.vehicles.filter(v => v.status === 'Available').length;
             const roadCount = state.vehicles.filter(v => v.status === 'In Use').length;
             const totalVehicles = state.vehicles.length;
@@ -1433,8 +1352,8 @@
                     const isSuper = state.adminRole === 'super';
                     const isGap = log.isSystemGap;
 
-                    const statusDot = log.status === 'Active' ? 'bg-emerald-500 animate-pulse' : isGap ? 'bg-indigo-400 font-bold ring-2 ring-indigo-100' : (log.status === 'Auto-Closed' || log.status === 'Closed') ? 'bg-emerald-500' : log.status === 'Force-Closed' ? 'bg-red-500' : 'bg-slate-400';
-                    const statusText = log.status === 'Active' ? 'text-emerald-600' : isGap ? 'text-indigo-600' : log.status === 'Force-Closed' ? 'text-red-600' : (log.status === 'Auto-Closed' || log.status === 'Closed') ? 'text-emerald-600' : 'text-slate-500';
+                    const statusDot = log.status === 'Active' ? 'bg-emerald-500 animate-pulse' : isGap ? 'bg-indigo-400 font-bold ring-2 ring-indigo-100' : log.status === 'Auto-Closed' ? 'bg-amber-500' : log.status === 'Force-Closed' ? 'bg-red-500' : 'bg-slate-400';
+                    const statusText = log.status === 'Active' ? 'text-emerald-600' : isGap ? 'text-indigo-600' : log.status === 'Force-Closed' ? 'text-red-600' : log.status === 'Auto-Closed' ? 'text-amber-600' : 'text-slate-500';
                     const distanceHtml = (log.startingKm != null && log.endingKm != null) ? `<span class="text-slate-800 font-bold">${(Number(log.endingKm) - Number(log.startingKm)).toLocaleString()} km</span>` : '-';
                     const actionHtml = log.status === 'Active' ? `<button onclick="window.forceCloseTrip('${log.id}')" class="px-2 py-1 rounded bg-red-50 text-red-600 text-[9px] font-bold uppercase tracking-wider hover:bg-red-100 transition-colors whitespace-nowrap">Force Close</button>` : '';
                     const discrepancyIcon = log.hasDiscrepancy ? `<div class="group relative flex items-center justify-center cursor-help">
@@ -1565,6 +1484,7 @@
                     </div>
                 </div>`;
             } else if (state.adminTab === 'reports') {
+                // Calculate Stats
                 const totalTrips = state.logs.length;
                 const totalKm = state.logs.reduce((sum, l) => sum + ((l.startingKm != null && l.endingKm != null) ? (l.endingKm - l.startingKm) : 0), 0);
                 const activeTrips = state.logs.filter(l => l.status === 'Active').length;
@@ -1589,6 +1509,7 @@
                         <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 italic">Live Data Update</div>
                     </div>
  
+                    <!-- Top Stats Grid -->
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
                         <div class="bg-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-500/20 relative overflow-hidden group">
                             <div class="absolute -right-2 -bottom-2 opacity-10 transform rotate-12 transition-transform group-hover:scale-110"><i class="fas fa-road text-6xl"></i></div>
@@ -1619,6 +1540,7 @@
                     </div>
  
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Vehicle Performance -->
                         <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                             <h3 class="font-bold text-slate-800 mb-6 flex items-center justify-between uppercase tracking-wide text-xs">
                                 <span><i class="fas fa-car-side text-blue-500 mr-2"></i> Vehicle Performance (KM)</span>
@@ -1641,6 +1563,7 @@
                             </div>
                         </div>
  
+                        <!-- Driver Participation -->
                         <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                             <h3 class="font-bold text-slate-800 mb-6 flex items-center justify-between uppercase tracking-wide text-xs">
                                 <span><i class="fas fa-user-friends text-blue-500 mr-2"></i> Driver Participation (Trips)</span>
@@ -1680,44 +1603,12 @@
                 `).join('');
 
                 contentHtml = `
-                <div class="slide-up max-w-4xl mx-auto">
-                    <h2 class="text-xl font-bold text-slate-800 font-heading uppercase tracking-tight mb-8">System Control Panel</h2>
+                <div class="slide-up">
+                    <h2 class="text-xl font-bold text-slate-800 font-heading uppercase tracking-tight mb-8">System Security & Settings</h2>
                     
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <div class="space-y-6">
-                            <!-- Global Announcement -->
-                            <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-                                <div class="p-6 border-b border-slate-50 bg-slate-50 flex items-center justify-between">
-                                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                                        <i class="fas fa-bullhorn text-blue-500"></i> Global Announcement Center
-                                    </h3>
-                                </div>
-                                <div class="p-6 space-y-4">
-                                    <p class="text-xs text-slate-400 leading-relaxed font-medium">Broadcast a message to every driver. It will appear as a popup the next time they use the app.</p>
-                                    <textarea id="broadcast-input" rows="3" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all text-sm font-medium text-slate-700" placeholder="Type your announcement here...">${state.settings.broadcastMessage || ''}</textarea>
-                                    <button onclick="window.updateBroadcast()" class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold font-heading text-[10px] tracking-widest uppercase hover:bg-slate-800 shadow-md transition-all">Send Broadcast to All Drivers</button>
-                                </div>
-                            </div>
-
-                            <!-- Database Maintenance -->
-                            <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-                                <div class="p-6 border-b border-slate-50 bg-slate-50 flex items-center justify-between">
-                                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                                        <i class="fas fa-wrench text-amber-500"></i> Database Maintenance
-                                    </h3>
-                                </div>
-                                <div class="p-6">
-                                    <p class="text-xs text-slate-400 mb-6 leading-relaxed font-medium">Repair overlapping logs and fix data integrity issues. This will automatically reconcile vehicle states.</p>
-                                    <button onclick="window.runDataCleanup()" class="px-6 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold font-heading text-[10px] tracking-widest uppercase hover:bg-slate-50 transition-all flex items-center gap-2">
-                                        <i class="fas fa-broom"></i> Scan & Repair Fleet States
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="space-y-6">
-                            <!-- Security Management -->
-                            <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+                            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                                 <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide text-xs"><i class="fas fa-user-plus text-blue-500"></i> Add New Admin</h3>
                                 ${isAdminSuper ? `
                                     <div class="space-y-4">
@@ -1726,22 +1617,46 @@
                                             <input type="password" id="new-admin-pin" placeholder="••••" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 font-bold tracking-widest">
                                         </div>
                                         <button onclick="window.submitAdmin()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold font-heading text-xs tracking-widest uppercase transition-all shadow-md">Create Account</button>
-                                        <p class="text-[10px] text-slate-400 italic text-center leading-relaxed px-4 mt-2">Regular admins have view-only access to logbooks and fleet data. Edit/Delete rights are reserved for Super Admin.</p>
+                                        <p class="text-[10px] text-slate-400 italic text-center leading-relaxed px-4">Regular admins have view-only access to logbooks and fleet data. Edit/Delete rights are reserved for Super Admin.</p>
                                     </div>
                                 ` : `
-                                    <div class="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                    <div class="py-8 text-center bg-slate-50 rounded-xl border border-dashed border-200">
                                         <i class="fas fa-lock text-slate-300 text-3xl mb-3"></i>
                                         <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Access Restricted</p>
-                                        <p class="text-[10px] text-slate-400 px-6 mt-1">Only Super Admin can manage other accounts.</p>
+                                        <p class="text-[10px] text-slate-400 px-6 mt-1">Only Super Admin can manage other admin accounts.</p>
                                     </div>
                                 `}
                             </div>
-
-                             <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col">
+ 
+                            <div class="bg-slate-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden group">
+                                <div class="absolute top-0 right-0 p-6 opacity-10 transform scale-150 rotate-[-15deg] group-hover:scale-175 transition-transform duration-700">
+                                    <i class="fas fa-shield-alt text-8xl"></i>
+                                </div>
+                                <h3 class="font-bold mb-4 flex items-center gap-2 uppercase tracking-widest text-xs relative z-10"><i class="fas fa-key text-blue-400"></i> Super Admin Status</h3>
+                                <div class="relative z-10">
+                                    <div class="flex items-center gap-3 mb-4">
+                                        <div class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></div>
+                                        <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Global Override Active</p>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 leading-relaxed max-w-xs">Super Admin PIN is managed via source configuration or master document. Protect this PIN carefully.</p>
+                                </div>
+                            </div>
+                        </div>
+ 
+                        <div class="space-y-6">
+                             <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
                                 <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide text-xs"><i class="fas fa-users-cog text-blue-500"></i> Admin Access List</h3>
-                                <div class="space-y-3 flex-1 overflow-y-auto max-h-[300px] pr-1">
+                                <div class="space-y-3 flex-1 overflow-y-auto max-h-[400px] pr-1">
                                     ${adminList.length > 0 ? adminList : `<div class="py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">No regular admins configured</div>`}
                                 </div>
+                            </div>
+
+                            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide text-xs"><i class="fas fa-broom text-amber-500"></i> Database Maintenance</h3>
+                                <p class="text-[10px] text-slate-500 mb-4 leading-relaxed font-medium">Repair overlapping logs and fix data integrity issues. This will automatically trim trips that were left active while others were in progress.</p>
+                                <button onclick="window.runDataCleanup()" class="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold font-heading text-xs tracking-widest uppercase transition-all shadow-md flex items-center justify-center gap-2">
+                                    <i class="fas fa-wand-magic-sparkles"></i> Clean & Repair Logs
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1749,65 +1664,32 @@
             }
 
             return `
-            <div class="bg-slate-50 min-h-screen pb-12 w-full">
-                <header class="py-5 px-6 sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex justify-between items-center mb-8 shadow-sm">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-lg">
-                            <i class="fas fa-shield-halved"></i>
-                        </div>
-                        <h1 class="text-lg font-bold text-slate-800 font-heading uppercase tracking-widest">Fleet Control</h1>
+            <div class="w-full fade-in pb-12 pt-8 overflow-x-hidden">
+                <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 px-6">
+                    <div>
+                        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-widest leading-none mb-1">Administrative Terminal</p>
+                        <h1 class="text-2xl font-bold text-slate-800 font-heading tracking-tight uppercase">Fleet Control Center</h1>
                     </div>
                     <div class="flex items-center gap-3">
-                        <button onclick="window.exitAdmin()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl text-[10px] font-bold transition-all uppercase tracking-widest flex items-center gap-2 border border-slate-200">
-                            <i class="fas fa-sign-out-alt"></i> Exit Panel
+                        ${connectionBadge()}
+                        <button onclick="window.exitAdmin()" class="bg-white border border-slate-200 text-slate-500 hover:text-slate-700 px-5 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-2 uppercase tracking-wide">
+                            <i class="fas fa-arrow-left"></i> Exit Admin
                         </button>
                     </div>
                 </header>
 
-                <div class="max-w-7xl mx-auto">
-                    <div class="px-6 mb-10 overflow-x-auto no-scrollbar">
-                        <div class="flex bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-1 inline-flex">
-                            ${tabs}
-                        </div>
-                    </div>
+                ${alertHubHtml}
+                ${schematicHtml}
 
-                    ${alertHubHtml}
-                    ${schematicHtml}
-
-                    <div class="px-6 tab-content-enter pb-10">
-                        <div class="flex items-center justify-between mb-4 max-w-7xl mx-auto opacity-50">
-                            <p class="text-[8px] font-black uppercase tracking-[0.5em] text-slate-400">Fleet Control Master v2.4.0</p>
-                            <div class="h-px flex-1 bg-slate-200 mx-4"></div>
-                            <div class="flex items-center gap-2">
-                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                <p class="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">Continuous Hardened Production Environment</p>
-                            </div>
-                        </div>
-                        ${contentHtml}
+                <div class="px-6">
+                    <div class="flex border-b border-slate-200 mb-8 overflow-x-auto no-scrollbar">
+                        ${tabs}
                     </div>
+                    ${contentHtml}
                 </div>
             </div>`;
         }
 
-        window.updateBroadcast = async () => {
-            const msg = document.getElementById('broadcast-input').value.trim();
-            try {
-                await setDoc(getDocRef('settings', 'global'), {
-                    broadcastMessage: msg,
-                    broadcastId: Date.now()
-                });
-                window.showToast('Global announcement active');
-            } catch (e) {
-                console.error(e);
-                window.showToast('Error sending broadcast', true);
-            }
-        };
-
-        window.setAdminTab = (tab) => {
-            state.adminTab = tab;
-            saveAppState();
-            render();
-        };
 
         window.handleLoginSubmit = async () => {
             if (checkLoginLockout()) return;
@@ -1819,16 +1701,19 @@
                 return;
             }
 
+            // SECURITY: Use query-based check instead of searching global PIN lists
             if (pin === ADMIN_PIN) {
                 recordLoginAttempt(true);
                 state.view = 'admin';
                 state.adminRole = 'super';
                 input.value = '';
+                // Re-trigger snapshots to get the real PINs for Super Admin
                 setupRealtimeListeners();
                 saveAppState();
                 render();
             } else {
                 try {
+                    // Check Admins
                     const adminSnap = await getDocs(query(getCol('admins'), where('pin', '==', pin)));
                     if (!adminSnap.empty) {
                         recordLoginAttempt(true);
@@ -1840,6 +1725,7 @@
                         return;
                     }
 
+                    // Check Drivers
                     const driverSnap = await getDocs(query(getCol('drivers'), where('pin', '==', pin)));
                     if (!driverSnap.empty) {
                         recordLoginAttempt(true);
@@ -1861,12 +1747,12 @@
             }
         };
 
+        // Listen for Enter key on login
         document.addEventListener('keydown', (e) => {
             if (state.view === 'login' && e.key === 'Enter') {
                 window.handleLoginSubmit();
             }
         });
-
         window.openModal = (modalId, contentId) => {
             const m = document.getElementById(modalId);
             const c = document.getElementById(contentId);
@@ -1904,10 +1790,12 @@
             }, 3000);
         };
 
+        // --- Trip Actions ---
         window.openStartModal = async (vid) => {
             state.selectedVehicle = state.vehicles.find(v => v.id === vid);
             if (!state.selectedVehicle) return;
 
+            // Fetch last known odometer from server (more reliable than local cache)
             let lastKm = 0;
             try {
                 const q = query(getCol('logs'), where('vehicleId', '==', vid), where('status', 'in', ['Closed', 'Auto-Closed', 'Force-Closed']));
@@ -1932,26 +1820,19 @@
             window.openModal('start-modal', 'start-modal-content');
             saveAppState();
         };
-
         window.confirmStartDriving = async () => {
-            const btn = document.getElementById('start-btn');
-            if (btn.disabled) return;
-
             const v = state.selectedVehicle;
             const purpose = document.getElementById('purpose-input').value.trim();
             const startKm = document.getElementById('start-km-input').value.trim();
- 
+
             if (!v) return;
             if (!startKm || isNaN(Number(startKm))) { window.showToast('Please enter Starting KM', true); return; }
             if (!purpose) { window.showToast('Please enter a trip purpose', true); return; }
- 
-            // Anti-Double Tap
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Starting...';
 
             const enterKmNum = Number(startKm);
             const lastEndKm = v.lastEndKm || 0;
 
+            // --- ZERO LATENCY UI: Start transition IMMEDIATELY ---
             const newLogRef = doc(getCol('logs'));
             const logId = newLogRef.id;
             const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
@@ -1989,6 +1870,7 @@
 
             // --- BACKGROUND SYNC: Perform Firebase writes asynchronously (Burst Mode) ---
             state.isSyncing = true;
+            state.pendingWrites++;
             render();
 
             const syncBurst = async () => {
@@ -2031,18 +1913,16 @@
                         discrepancyGap: enterKmNum - lastEndKm
                     }));
 
-                    // We do NOT 'await' here because we don't want to wait for the network.
-                    // We just fire them into the SDK queue.
-                    Promise.all(promises).catch(e => console.warn("Fire-and-forget sync error:", e));
-
+                    await Promise.all(promises);
                 } catch (e) {
                     console.warn("Background Sync Warning (Start):", e);
                 } finally {
-                    // GIVE IT 500ms TO COMMIT TO DISK (indexedDB)
-                    setTimeout(() => {
+                    state.pendingWrites--;
+                    if (state.pendingWrites <= 0) {
+                        state.pendingWrites = 0;
                         state.isSyncing = false;
-                        render();
-                    }, 500);
+                    }
+                    render();
                 }
             };
 
@@ -2054,18 +1934,11 @@
         };
 
         window.confirmStopDriving = async () => {
-            const btn = document.getElementById('stop-btn');
-            if (btn.disabled) return;
-
             const v = state.selectedVehicle;
             const km = document.getElementById('ending-km-input').value.trim();
             const notes = document.getElementById('trip-notes-input').value.trim();
             if (!v) return;
             if (!km || isNaN(Number(km))) { window.showToast('Please enter a valid Ending KM', true); return; }
-
-            // Anti-Double Tap
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Parking...';
             const endKmNum = Number(km);
 
             // 1. Find the active log/Id - Use the direct ID stored on the vehicle
@@ -2109,6 +1982,7 @@
 
             // --- BACKGROUND SYNC: Perform Firestore updates (Burst Mode) ---
             state.isSyncing = true;
+            state.pendingWrites++;
             render();
 
             const syncBurstClose = async () => {
@@ -2132,17 +2006,16 @@
                         }));
                     }
 
-                    // We do NOT 'await' here because we don't want to wait for the network.
-                    Promise.all(promises).catch(e => console.warn("Fire-and-forget sync error:", e));
-
+                    await Promise.all(promises);
                 } catch (e) {
                     console.warn("Background Close Sync Warning:", e);
                 } finally {
-                    // GIVE IT 500ms TO COMMIT TO DISK (indexedDB)
-                    setTimeout(() => {
+                    state.pendingWrites--;
+                    if (state.pendingWrites <= 0) {
+                        state.pendingWrites = 0;
                         state.isSyncing = false;
-                        render();
-                    }, 500);
+                    }
+                    render();
                 }
             };
 
@@ -2430,32 +2303,6 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-        };
-
-        window.submitAdmin = async () => {
-            const pin = document.getElementById('new-admin-pin').value.trim();
-            if (pin.length < 4) { window.showToast('PIN must be at least 4 digits', true); return; }
-            try {
-                await addDoc(getCol('admins'), { pin: pin, role: 'regular', createdAt: new Date().toISOString() });
-                window.showToast('New administrator added');
-                document.getElementById('new-admin-pin').value = '';
-                render();
-            } catch (e) {
-                console.error(e);
-                window.showToast('Error adding admin', true);
-            }
-        };
-
-        window.deleteAdmin = async (id) => {
-            if (!confirm('Are you sure you want to remove this administrator?')) return;
-            try {
-                await deleteDoc(getDocRef('admins', id));
-                window.showToast('Administrator removed');
-                render();
-            } catch (e) {
-                console.error(e);
-                window.showToast('Error removing admin', true);
-            }
         };
 
         window.runDataCleanup = async () => {
