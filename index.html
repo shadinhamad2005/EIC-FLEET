@@ -706,13 +706,24 @@
         function handleAutoBypass() {
             if (!state.currentUser || state.view === 'admin') return render();
             
+            // If the vehicle list is empty but we ARE expecting an active trip, 
+            // WAIT for the data. Don't kick the user out of their view yet.
+            if (state.vehicles.length === 0) {
+                if (state.view === 'active_trip') return render();
+                // Otherwise continue
+            }
+
             const myActive = state.vehicles.find(v => v.status === 'In Use' && v.currentDriverId === state.currentUser.id);
             if (myActive) {
                 state.view = 'active_trip';
                 state.selectedVehicle = myActive;
             } else {
-                state.view = 'vehicles';
-                state.selectedVehicle = null;
+                // Only revert to vehicle list if we have data (vehicles.length > 0)
+                // and we've finished the initial load sync.
+                if (state.vehicles.length > 0) {
+                    state.view = 'vehicles';
+                    state.selectedVehicle = null;
+                }
             }
             saveAppState();
             render();
@@ -819,6 +830,10 @@
 
             return `
             <div class="w-full max-w-md mx-auto fade-in pb-12 pt-8 px-4">
+                <header class="flex justify-between items-center mb-6">
+                    ${connectionBadge()}
+                    <button onclick="window.logout()" class="text-slate-400 hover:text-red-600 transition-colors"><i class="fas fa-sign-out-alt text-xl"></i></button>
+                </header>
                 <div class="bg-white rounded-2xl overflow-hidden shadow-xl border border-slate-200 flex flex-col">
                     <div class="p-4 flex items-center justify-between border-b border-slate-100 bg-slate-50">
                         <div class="flex items-center gap-3">
@@ -855,12 +870,11 @@
 
         function renderVehicles() {
             if (!state.currentUser) return '';
-            let vehicleCards = state.vehicles.map(vehicle => {
+            const vehicleCards = state.vehicles.map(vehicle => {
                 const isTaken = vehicle.status === 'In Use';
                 const driverData = isTaken ? state.drivers.find(d => d.id === vehicle.currentDriverId) : null;
                 const dName = driverData ? driverData.name : 'Unknown';
  
-                // Enhanced Photo with Blueprint Placeholder
                 const photoHtml = vehicle.photo 
                     ? `<img src="${vehicle.photo}" class="w-full h-48 object-cover img-zoom-hover" onerror="this.src=''; this.className='hidden'; this.nextElementSibling.classList.remove('hidden');"> 
                        <div class="blueprint-bg w-full h-48 flex items-center justify-center hidden"><i class="fas fa-car text-5xl text-blue-200/50"></i></div>` 
@@ -877,7 +891,6 @@
                     actionBtn = `<button onclick="window.openStartModal('${vehicle.id}')" class="w-full py-4 btn-fancy text-white font-bold rounded-xl shadow-lg text-sm uppercase tracking-widest btn-modern">Launch Trip</button>`;
                 }
  
-                // Compliance Visuals (Wellness Rings)
                 const compliance = getCompliance(vehicle);
                 const hasError = compliance.some(a => a.type === 'error');
                 const hasWarning = compliance.some(a => a.type === 'warning');
@@ -886,15 +899,12 @@
                 return `
                 <div class="card-perspective h-full">
                     <div class="bg-white rounded-3xl overflow-hidden border border-slate-200 h-full flex flex-col group card-tilt ${glowClass} relative">
-                        <!-- Wellness Ring Indicator -->
                         <div class="wellness-ring ${ringClass} ${hasError || hasWarning ? 'wellness-ring-pulse' : ''}"></div>
-                        
                         <div class="relative overflow-hidden h-48 rounded-t-[1.8rem]">
                             ${photoHtml}
                             <div class="absolute top-4 right-4 z-20">${statusBadge}</div>
                             <div class="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                         </div>
-                        
                         <div class="p-6 flex-1 flex flex-col bg-white relative">
                             <div class="mb-4">
                                 <h3 class="font-bold text-slate-800 text-xl font-heading uppercase tracking-tight group-hover:text-blue-600 transition-colors">${vehicle.makeModel}</h3>
@@ -903,7 +913,6 @@
                                     ${vehicle.plate}
                                 </div>
                             </div>
- 
                             <div class="grid grid-cols-2 gap-4 mt-auto mb-6">
                                 <div class="bg-slate-50 rounded-xl p-3 border border-slate-100/50">
                                     <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Logs</p>
@@ -917,7 +926,6 @@
                                     }
                                 </div>
                             </div>
- 
                             <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
                                 ${actionBtn}
                             </div>
@@ -926,31 +934,38 @@
                 </div>`;
             }).join('');
 
-            if (state.vehicles.length === 0) {
-                vehicleCards = `<div class="col-span-full py-16 text-center text-slate-400 bg-white border border-dashed border-slate-300 rounded-2xl font-bold uppercase tracking-wider text-sm">No vehicles added yet</div>`;
-            }
+            const emptyStateHtml = `
+                <div class="col-span-full py-20 flex flex-col items-center justify-center text-slate-400 bg-white border border-dashed border-slate-300 rounded-[2.5rem]">
+                    <i class="fas fa-satellite-dish text-4xl mb-4 animate-bounce text-blue-500"></i>
+                    <p class="font-bold uppercase tracking-widest text-[10px]">Syncing Fleet Data...</p>
+                    <p class="text-xs mt-1 opacity-50 lowercase first-letter:uppercase text-center px-6">Ready for duty</p>
+                </div>`;
 
             return `
-            <div class="w-full fade-in pb-12">
+            <div class="w-full fade-in pb-12 bg-slate-50 min-h-screen">
                 <header class="py-5 px-6 sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex justify-between items-center mb-8 shadow-sm">
                     <div class="flex items-center gap-4">
                         ${state.currentUser.photo ? `<img src="${state.currentUser.photo}" class="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm">` : `<div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 border-2 border-white flex items-center justify-center text-xl font-bold shadow-sm font-heading">${state.currentUser.name.charAt(0)}</div>`}
                         <div>
                             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Driver</p>
-                            <h1 class="text-base font-bold text-slate-800 font-heading uppercase tracking-wide">${state.currentUser.name}</h1>
+                            <h1 class="text-base font-bold text-slate-800 font-heading uppercase tracking-wide text-blue-600">${state.currentUser.name}</h1>
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
                         ${connectionBadge()}
-                        <button onclick="window.logout()" class="w-10 h-10 rounded-full bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 border border-slate-200 transition-all flex items-center justify-center">
+                        <button onclick="window.logout()" class="w-10 h-10 rounded-full bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 border border-slate-200 transition-all flex items-center justify-center" title="Sign Out">
                             <i class="fas fa-power-off"></i>
                         </button>
                     </div>
                 </header>
                 
-                <h2 class="text-2xl font-bold mb-6 px-6 text-slate-800 font-heading tracking-tight uppercase">Select a Vehicle</h2>
-                <div class="mobile-card-stack grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-6">
-                    ${vehicleCards}
+                <div class="max-w-7xl mx-auto px-6">
+                    <h2 class="text-2xl font-bold mb-8 text-slate-800 font-heading tracking-tight uppercase px-2 flex items-center gap-3">
+                        <i class="fas fa-key text-blue-500 text-sm"></i> Select a Vehicle
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        ${vehicleCards.length > 0 ? vehicleCards : emptyStateHtml}
+                    </div>
                 </div>
             </div>`;
         }
@@ -1608,7 +1623,13 @@
                 };
                 state.logs.unshift(tempLog);
 
-                // Success Feedback
+                // Transition view IMMEDIATELY before the modal even finishes closing
+                state.view = 'active_trip';
+                state.selectedVehicle = state.vehicles[vIdx] || v;
+                saveAppState();
+                render();
+
+                // Success Feedback (Modal closing)
                 setTimeout(() => {
                     window.closeModal('start-modal', 'start-modal-content');
                     setTimeout(() => {
@@ -1616,10 +1637,9 @@
                         document.getElementById('start-success').classList.add('hidden');
                         document.getElementById('purpose-input').value = '';
                         document.getElementById('start-km-input').value = '';
-                        handleAutoBypass();
                     }, 300);
                     if (!isOnline) window.showToast('Offline: Trip started. Will sync when online.');
-                }, 300);
+                }, 100);
 
             } catch(e) {
                 console.error(e);
