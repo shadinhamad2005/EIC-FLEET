@@ -618,10 +618,9 @@
                 state.vehicles.sort((a,b) => a.status === 'Available' ? -1 : 1);
                 checkLoaded('vehicles');
                 
-                // If we are logged in and our vehicle updates (e.g., someone forces takeover), re-evaluate
-                if (state.currentUser && state.view === 'active_trip') {
-                    const myActive = state.vehicles.find(v => v.status === 'In Use' && v.currentDriverId === state.currentUser.id);
-                    if (!myActive) handleAutoBypass(); // We lost the vehicle
+                // If we are already loaded, re-evaluate view (e.g. for takeovers)
+                if (state.currentUser && !state.isLoading) {
+                    handleAutoBypass(); 
                 }
             });
             onSnapshot(getCol('logs'), (snapshot) => {
@@ -706,25 +705,37 @@
         function handleAutoBypass() {
             if (!state.currentUser || state.view === 'admin') return render();
             
-            // If the vehicle list is empty but we ARE expecting an active trip, 
-            // WAIT for the data. Don't kick the user out of their view yet.
+            // If the vehicle list is empty, always trust the current view (especially for offline recovery)
             if (state.vehicles.length === 0) {
-                if (state.view === 'active_trip') return render();
-                // Otherwise continue
+                return render();
             }
 
-            const myActive = state.vehicles.find(v => v.status === 'In Use' && v.currentDriverId === state.currentUser.id);
-            if (myActive) {
-                state.view = 'active_trip';
-                state.selectedVehicle = myActive;
-            } else {
-                // Only revert to vehicle list if we have data (vehicles.length > 0)
-                // and we've finished the initial load sync.
-                if (state.vehicles.length > 0) {
+            // Case A: We are currently on an Active Trip screen
+            if (state.view === 'active_trip' && state.selectedVehicle) {
+                const refreshedVehicle = state.vehicles.find(v => v.id === state.selectedVehicle.id);
+                // Only kick them out if we find the vehicle and its status is now 'Available'
+                if (refreshedVehicle && refreshedVehicle.status === 'Available') {
+                    state.view = 'vehicles';
+                    state.selectedVehicle = null;
+                } else if (refreshedVehicle) {
+                    // Update our reference with any new server data (odometer, etc)
+                    state.selectedVehicle = refreshedVehicle;
+                }
+                // Otherwise, stay on active_trip (maybe vehicle is still loading its status)
+            } 
+            // Case B: We are on the Login or Vehicles screen, check if we SHOULD move to Active Trip
+            else {
+                const myActive = state.vehicles.find(v => v.status === 'In Use' && v.currentDriverId === state.currentUser.id);
+                if (myActive) {
+                    state.view = 'active_trip';
+                    state.selectedVehicle = myActive;
+                } else if (state.view === 'login') {
+                    // Initial login transition
                     state.view = 'vehicles';
                     state.selectedVehicle = null;
                 }
             }
+
             saveAppState();
             render();
         }
@@ -1584,17 +1595,18 @@
                     });
                 }
 
-                // 3. Update Vehicle Status
+                // 3. Define the ID FIRST so we can use it in both places
+                const newLogRef = doc(getCol('logs'));
+                const logId = newLogRef.id;
+
+                // 4. Update Vehicle Status
                 await updateDoc(getDocRef('vehicles', v.id), {
                     status: 'In Use',
                     currentDriverId: state.currentUser.id,
-                    activeLogId: logId // Store the ID directly for easy retrieval
+                    activeLogId: logId
                 });
 
-                // 4. Create the New Log with a PERSISTENT ID (so we can update it offline later)
-                const newLogRef = doc(getCol('logs')); // Pre-generates a unique firestore ID
-                const logId = newLogRef.id;
-
+                // 5. Create the New Log
                 await setDoc(newLogRef, {
                     vehicleId: v.id,
                     driverId: state.currentUser.id,
@@ -1608,14 +1620,18 @@
                     discrepancyGap: enterKmNum - lastEndKm
                 });
 
-                // --- OPTIMISTIC UI: Update local state immediately for instant feedback ---
+                // --- OPTIMISTIC UI ---
+                const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
                 if (vIdx > -1) {
                     state.vehicles[vIdx].status = 'In Use';
                     state.vehicles[vIdx].currentDriverId = state.currentUser.id;
                     state.vehicles[vIdx].activeLogId = logId;
                 }
                 
-                // Add a temporary local log with the REAL Firestore ID we just generated
+                state.selectedVehicle = state.vehicles[vIdx] || v;
+                state.view = 'active_trip';
+                
+                // Add a temporary local log with the REAL Firestore ID
                 const tempLog = {
                     id: logId,
                     vehicleId: v.id,
@@ -1627,10 +1643,7 @@
                 };
                 state.logs.unshift(tempLog);
 
-                // Transition view IMMEDIATELY before the modal even finishes closing
-                state.view = 'active_trip';
-                state.selectedVehicle = state.vehicles[vIdx] || v;
-                saveAppState();
+                saveAppState(); // Critical: Save immediately after starting
                 render();
 
                 // Success Feedback (Modal closing)
@@ -1718,11 +1731,13 @@
                 }
                 
                 // Update local log status
-                const logIdx = state.logs.findIndex(l => l.id === activeLog.id);
+                const logIdx = state.logs.findIndex(l => l.id === activeLogId);
                 if (logIdx > -1) {
                     state.logs[logIdx].status = 'Closed';
                     state.logs[logIdx].endingKm = endKmNum;
                 }
+
+                saveAppState(); // Critical: Save state after update
 
                 // Success Feedback
                 setTimeout(() => {
