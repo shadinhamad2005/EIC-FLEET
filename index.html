@@ -567,16 +567,26 @@
 
         async function init() {
             loadAppState();
-            render(); // Initial render from persistent state
+            render(); // Instant UI recovery from local cache
+
+            // Start synchronization tasks immediately, even before (or if) auth finishes.
+            // This is key for offline-to-online background sync.
+            setupRealtimeListeners();
 
             try {
-                await signInAnonymously(auth);
-                setupRealtimeListeners();
+                // Trigger anonymous auth in the background
+                signInAnonymously(auth).catch(e => console.error("Offline Auth Warning:", e));
             } catch (error) {
-                console.error("Firebase Auth Error:", error);
-                state.isLoading = false;
-                render();
+                console.error("Critical Auth Error:", error);
             }
+            
+            // Set a safety timeout to hide the loading spinner if initialization takes too long
+            setTimeout(() => {
+                if (state.isLoading) {
+                    state.isLoading = false;
+                    render();
+                }
+            }, 3000);
         }
 
         function formatDate(isoString) {
@@ -1545,69 +1555,75 @@
             const startKm = document.getElementById('start-km-input').value.trim();
 
             if(!v) return;
-            if(!startKm) { window.showToast('Please enter Starting KM', true); return; }
-            if(isNaN(Number(startKm))) { window.showToast('Starting KM must be a number', true); return; }
-            if(!purpose) { window.showToast('Please enter a purpose', true); return; }
+            if(!startKm || isNaN(Number(startKm))) { window.showToast('Please enter Starting KM', true); return; }
+            if(!purpose) { window.showToast('Please enter a trip purpose', true); return; }
 
             const enterKmNum = Number(startKm);
+            const lastEndKm = v.lastEndKm || 0;
 
+            // --- ZERO LATENCY UI: Start transition IMMEDIATELY ---
+            const newLogRef = doc(getCol('logs'));
+            const logId = newLogRef.id;
+            const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
+            
+            if (vIdx > -1) {
+                state.vehicles[vIdx].status = 'In Use';
+                state.vehicles[vIdx].currentDriverId = state.currentUser.id;
+                state.vehicles[vIdx].activeLogId = logId;
+            }
+            
+            state.selectedVehicle = state.vehicles[vIdx] || v;
+            state.view = 'active_trip';
+            
+            // Add to logs immediately
+            state.logs.unshift({
+                id: logId,
+                vehicleId: v.id,
+                driverId: state.currentUser.id,
+                status: 'Active',
+                startingKm: enterKmNum,
+                startTime: new Date().toISOString(),
+                purpose: purpose
+            });
+
+            saveAppState();
+            render(); // Transition happens HERE, instantly
+            
+            // Success Feedback (Instant transition is done, we just tidy up the modal)
+            window.closeModal('start-modal', 'start-modal-content');
+            setTimeout(() => {
+                document.getElementById('start-form').classList.remove('hidden');
+                document.getElementById('purpose-input').value = '';
+                document.getElementById('start-km-input').value = '';
+            }, 300);
+
+            // --- BACKGROUND SYNC: Perform Firebase writes asynchronously ---
             try {
-                // Show loader immediately
-                document.getElementById('start-form').classList.add('hidden');
-                document.getElementById('start-success').classList.remove('hidden');
-                document.getElementById('start-success').classList.add('flex');
-
-                // OFFLINE-SAFE LOGIC: Use local state/cache for validation
-                const lastEndKm = state.logs.filter(l => l.vehicleId === v.id && l.endingKm != null)
-                                     .reduce((max, d) => Math.max(max, d.endingKm || 0), 0);
-
-                if (enterKmNum < lastEndKm) {
-                    throw `ERROR: Odometer mismatch. Vehicle was last recorded at ${lastEndKm} KM. Current entry (${enterKmNum}) is lower and has been blocked.`;
-                }
-
-                // 1. GAP DETECTION: Create a "Missing Log" if there's an upward jump
+                // Gap Filler (Background)
                 if (enterKmNum > lastEndKm) {
                     await addDoc(getCol('logs'), {
                         vehicleId: v.id,
                         driverId: 'system',
-                        driverName: '[MISSING LOG]',
+                        driverName: '[OFFLINE GAP]',
                         startTime: new Date().toISOString(),
                         endTime: new Date().toISOString(),
                         status: 'Auto-Closed',
-                        purpose: 'Unrecorded mileage detected between trips.',
+                        purpose: 'Unrecorded mileage (Offline-to-Online Sync)',
                         startingKm: lastEndKm,
                         endingKm: enterKmNum,
-                        isSystemGap: true,
-                        notes: 'System-generated gap filler (Offline Recorded).'
+                        isSystemGap: true
                     });
                 }
 
-                // 2. Find and Auto-Close ALL active logs for this vehicle
-                const activeQuery = query(getCol('logs'), where('vehicleId', '==', v.id), where('status', '==', 'Active'));
-                const activeSnap = await getDocs(activeQuery);
-                
-                for (const logDoc of activeSnap.docs) {
-                    await updateDoc(logDoc.ref, {
-                        status: 'Auto-Closed',
-                        endTime: new Date().toISOString(),
-                        endingKm: enterKmNum,
-                        notes: (logDoc.data().notes ? logDoc.data().notes + " | " : "") + `Auto-closed; End KM recorded by ${state.currentUser.name}`
-                    });
-                }
-
-                // 3. Define the ID FIRST so we can use it in both places
-                const newLogRef = doc(getCol('logs'));
-                const logId = newLogRef.id;
-
-                // 4. Update Vehicle Status
-                await updateDoc(getDocRef('vehicles', v.id), {
+                // Vehicle Status Update (Background)
+                updateDoc(getDocRef('vehicles', v.id), {
                     status: 'In Use',
                     currentDriverId: state.currentUser.id,
                     activeLogId: logId
-                });
+                }).catch(e => console.error("Sync Error (Vehicle):", e));
 
-                // 5. Create the New Log
-                await setDoc(newLogRef, {
+                // Log Creation (Background/Queue)
+                setDoc(newLogRef, {
                     vehicleId: v.id,
                     driverId: state.currentUser.id,
                     startTime: new Date().toISOString(),
@@ -1618,53 +1634,13 @@
                     endingKm: null,
                     hasDiscrepancy: enterKmNum !== lastEndKm,
                     discrepancyGap: enterKmNum - lastEndKm
+                }).catch(e => {
+                    console.error("Sync Error (Log):", e);
+                    window.showToast("Local action saved; pending server sync.", false);
                 });
 
-                // --- OPTIMISTIC UI ---
-                const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
-                if (vIdx > -1) {
-                    state.vehicles[vIdx].status = 'In Use';
-                    state.vehicles[vIdx].currentDriverId = state.currentUser.id;
-                    state.vehicles[vIdx].activeLogId = logId;
-                }
-                
-                state.selectedVehicle = state.vehicles[vIdx] || v;
-                state.view = 'active_trip';
-                
-                // Add a temporary local log with the REAL Firestore ID
-                const tempLog = {
-                    id: logId,
-                    vehicleId: v.id,
-                    driverId: state.currentUser.id,
-                    status: 'Active',
-                    startingKm: enterKmNum,
-                    startTime: new Date().toISOString(),
-                    purpose: purpose
-                };
-                state.logs.unshift(tempLog);
-
-                saveAppState(); // Critical: Save immediately after starting
-                render();
-
-                // Success Feedback (Modal closing)
-                setTimeout(() => {
-                    window.closeModal('start-modal', 'start-modal-content');
-                    setTimeout(() => {
-                        document.getElementById('start-form').classList.remove('hidden');
-                        document.getElementById('start-success').classList.add('hidden');
-                        document.getElementById('purpose-input').value = '';
-                        document.getElementById('start-km-input').value = '';
-                    }, 300);
-                    if (!isOnline) window.showToast('Offline: Trip started. Will sync when online.');
-                }, 100);
-
             } catch(e) {
-                console.error(e);
-                window.showToast(typeof e === 'string' ? e : 'Error starting trip', true);
-                // Reset modal on error
-                document.getElementById('start-form').classList.remove('hidden');
-                document.getElementById('start-success').classList.add('hidden');
-                document.getElementById('start-success').classList.remove('flex');
+                console.warn("Background Sync Warning:", e);
             }
         };
 
@@ -1678,87 +1654,68 @@
             const notes = document.getElementById('trip-notes-input').value.trim();
             if(!v) return;
             if(!km || isNaN(Number(km))) { window.showToast('Please enter a valid Ending KM', true); return; }
-            
             const endKmNum = Number(km);
 
+            // 1. Find the active log/Id - Use the direct ID stored on the vehicle
+            const activeLogId = v.activeLogId;
+            const activeLogEntry = state.logs.find(log => log.id === activeLogId);
+            const startingKm = activeLogEntry ? activeLogEntry.startingKm : (v.lastEndKm || 0);
+
+            if (endKmNum < startingKm) {
+                window.showToast(`Error: Odometer cannot be less than start (${startingKm})`, true);
+                return;
+            }
+
+            // --- ZERO LATENCY UI: Reset views IMMEDIATELY ---
+            const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
+            if (vIdx > -1) {
+                state.vehicles[vIdx].status = 'Available';
+                state.vehicles[vIdx].currentDriverId = null;
+                state.vehicles[vIdx].activeLogId = null;
+                state.vehicles[vIdx].lastEndKm = endKmNum;
+            }
+            
+            // Update local log status
+            const logIdx = state.logs.findIndex(l => l.id === activeLogId);
+            if (logIdx > -1) {
+                state.logs[logIdx].status = 'Closed';
+                state.logs[logIdx].endingKm = endKmNum;
+                state.logs[logIdx].endTime = new Date().toISOString();
+            }
+
+            state.view = 'vehicles';
+            state.selectedVehicle = null;
+            saveAppState();
+            render(); // Happens instantly
+
+            window.closeModal('stop-modal', 'stop-modal-content');
+            setTimeout(() => {
+                document.getElementById('stop-form').classList.remove('hidden');
+                document.getElementById('ending-km-input').value = '';
+                document.getElementById('trip-notes-input').value = '';
+            }, 300);
+
+            // --- BACKGROUND SYNC: Perform Firestore updates ---
             try {
-                document.getElementById('stop-form').classList.add('hidden');
-                document.getElementById('stop-success').classList.remove('hidden');
-                document.getElementById('stop-success').classList.add('flex');
-
-                // 1. Find the active log (Use the direct ID stored on the vehicle for 100% accuracy)
-                let activeLogEntry = state.logs.find(log => log.id === v.activeLogId);
-                
-                // Fallback: If not in local log array, try to find ANY active log for this vehicle
-                if (!activeLogEntry) {
-                    activeLogEntry = state.logs.find(log => log.vehicleId === v.id && log.status === 'Active');
-                }
-                
-                if (!activeLogEntry && !v.activeLogId) {
-                    throw "No active trip ID found for this vehicle. Try refreshing.";
-                }
-
-                // If we STILL don't have the log object but we HAVE the ID, we can still proceed 
-                // by using the pre-calculated startingKm if available.
-                const activeLogId = activeLogEntry ? activeLogEntry.id : v.activeLogId;
-                const activeLogRef = getDocRef('logs', activeLogId);
-                const startingKm = activeLogEntry ? activeLogEntry.startingKm : (v.lastEndKm || 0);
-
-                if (endKmNum < startingKm) {
-                    throw `Error: Odometer cannot be less than start (${startingKm})`;
-                }
-
-                // 2. Update Vehicle Status
-                await updateDoc(getDocRef('vehicles', v.id), {
+                // Vehicle Update
+                updateDoc(getDocRef('vehicles', v.id), {
                     status: 'Available',
                     currentDriverId: null,
-                    activeLogId: null // Clear the reference
-                });
+                    activeLogId: null,
+                    lastEndKm: endKmNum
+                }).catch(e => console.error("Sync Error (Vehicle Close):", e));
 
-                // 3. Update Log
-                await updateDoc(activeLogRef, {
-                    status: 'Closed',
-                    endTime: new Date().toISOString(),
-                    endingKm: endKmNum,
-                    notes: notes || (activeLogEntry ? activeLogEntry.notes : null)
-                });
-
-                // --- OPTIMISTIC UI: Update local state immediately for instant feedback ---
-                const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
-                if (vIdx > -1) {
-                    state.vehicles[vIdx].status = 'Available';
-                    state.vehicles[vIdx].currentDriverId = null;
+                // Log Update
+                if (activeLogId) {
+                    updateDoc(getDocRef('logs', activeLogId), {
+                        status: 'Closed',
+                        endTime: new Date().toISOString(),
+                        endingKm: endKmNum,
+                        notes: notes || (activeLogEntry ? activeLogEntry.notes : null)
+                    }).catch(e => console.error("Sync Error (Log Close):", e));
                 }
-                
-                // Update local log status
-                const logIdx = state.logs.findIndex(l => l.id === activeLogId);
-                if (logIdx > -1) {
-                    state.logs[logIdx].status = 'Closed';
-                    state.logs[logIdx].endingKm = endKmNum;
-                }
-
-                saveAppState(); // Critical: Save state after update
-
-                // Success Feedback
-                setTimeout(() => {
-                    window.closeModal('stop-modal', 'stop-modal-content');
-                    setTimeout(() => {
-                        document.getElementById('stop-form').classList.remove('hidden');
-                        document.getElementById('stop-success').classList.add('hidden');
-                        document.getElementById('ending-km-input').value = '';
-                        document.getElementById('trip-notes-input').value = '';
-                        state.selectedVehicle = null;
-                        handleAutoBypass();
-                    }, 300);
-                    if (!isOnline) window.showToast('Offline: Vehicle secured. Will sync when online.');
-                }, 500);
-
             } catch(e) {
-                console.error(e);
-                window.showToast(typeof e === 'string' ? e : 'Error securing vehicle', true);
-                document.getElementById('stop-form').classList.remove('hidden');
-                document.getElementById('stop-success').classList.add('hidden');
-                document.getElementById('stop-success').classList.remove('flex');
+                console.warn("Background Close Sync Warning:", e);
             }
         };
 
