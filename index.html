@@ -1079,8 +1079,10 @@
                         <td class="py-4 pr-5 text-right">
                             <div class="flex items-center gap-2 justify-end">
                                 ${actionHtml}
-                                <button onclick="window.openEditLogModal('${log.id}')" class="text-slate-300 hover:text-blue-600 transition-colors p-1.5 bg-slate-50 rounded-lg shadow-sm"><i class="fas fa-edit text-xs"></i></button>
-                                ${isSuper ? `<button onclick="window.deleteLog('${log.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1.5 bg-slate-50 rounded-lg shadow-sm"><i class="fas fa-trash text-xs"></i></button>` : ''}
+                                ${isSuper ? `
+                                    <button onclick="window.openEditLogModal('${log.id}')" class="text-slate-300 hover:text-blue-600 transition-colors p-1.5 bg-slate-50 rounded-lg shadow-sm" title="Edit Log Entry"><i class="fas fa-edit text-xs"></i></button>
+                                    <button onclick="window.deleteLog('${log.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1.5 bg-slate-50 rounded-lg shadow-sm" title="Delete Log Entry"><i class="fas fa-trash text-xs"></i></button>
+                                ` : ''}
                             </div>
                         </td>
                     </tr>`;
@@ -1587,6 +1589,25 @@
                     discrepancyGap: enterKmNum - lastEndKm
                 });
 
+                // --- OPTIMISTIC UI: Update local state immediately for instant feedback ---
+                const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
+                if (vIdx > -1) {
+                    state.vehicles[vIdx].status = 'In Use';
+                    state.vehicles[vIdx].currentDriverId = state.currentUser.id;
+                }
+                
+                // Add a temporary local log so find works immediately
+                const tempLog = {
+                    id: 'temp-' + Date.now(),
+                    vehicleId: v.id,
+                    driverId: state.currentUser.id,
+                    status: 'Active',
+                    startingKm: enterKmNum,
+                    startTime: new Date().toISOString(),
+                    purpose: purpose
+                };
+                state.logs.unshift(tempLog);
+
                 // Success Feedback
                 setTimeout(() => {
                     window.closeModal('start-modal', 'start-modal-content');
@@ -1657,6 +1678,20 @@
                     endingKm: endKmNum,
                     notes: notes || (activeLog.notes || null)
                 });
+
+                // --- OPTIMISTIC UI: Update local state immediately for instant feedback ---
+                const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
+                if (vIdx > -1) {
+                    state.vehicles[vIdx].status = 'Available';
+                    state.vehicles[vIdx].currentDriverId = null;
+                }
+                
+                // Update local log status
+                const logIdx = state.logs.findIndex(l => l.id === activeLog.id);
+                if (logIdx > -1) {
+                    state.logs[logIdx].status = 'Closed';
+                    state.logs[logIdx].endingKm = endKmNum;
+                }
 
                 // Success Feedback
                 setTimeout(() => {
