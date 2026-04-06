@@ -3,11 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Company Fleet Tracker</title>
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3202/3202926.png">
+    <title>EIC Fleet Tracker | Advanced Logistics</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker: Registered'))
+                    .catch(e => console.error('Service Worker: Error', e));
+            });
+        }
+    </script>
+
     <!-- jsPDF & AutoTable -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -295,6 +312,35 @@
         </div>
     </div>
 
+    <!-- Edit Log Modal (Admin) -->
+    <div id="edit-log-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 relative" id="edit-log-content">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-lg text-slate-800 font-heading tracking-wide">Edit Log Record</h3>
+                <button onclick="window.closeModal('edit-log-modal', 'edit-log-content')" class="text-slate-400 hover:text-slate-600 transition-colors"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <div id="edit-log-form" class="p-6">
+                <p class="text-xs text-slate-400 mb-6 uppercase font-bold tracking-widest leading-relaxed">Fix unrecorded trips or correct driver assignments</p>
+                
+                <div class="mb-5">
+                    <label class="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Assign Driver</label>
+                    <select id="edit-log-driver-select" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all font-bold">
+                        <!-- Drivers populated dynamically -->
+                    </select>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Trip Purpose / Corrective Note</label>
+                    <input type="text" id="edit-log-purpose" placeholder="e.g., Unlogged maintenance trip" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all text-sm font-medium">
+                </div>
+
+                <button onclick="window.confirmEditLog()" class="w-full py-4 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold font-heading text-xs tracking-widest uppercase shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                    <i class="fas fa-save"></i> Apply Admin Correction
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Add/Edit Vehicle Modal -->
     <div id="add-vehicle-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300" id="add-vehicle-content">
@@ -396,7 +442,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { initializeFirestore, persistentLocalCache, collection, onSnapshot, doc, updateDoc, addDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, persistentLocalCache, collection, onSnapshot, doc, updateDoc, addDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase config
         const firebaseConfig = {
@@ -492,21 +538,44 @@
             }
         }
 
+        function saveAppState() {
+            const persistentState = {
+                view: state.view,
+                adminTab: state.adminTab,
+                adminRole: state.adminRole,
+                currentUser: state.currentUser,
+                selectedVehicle: state.selectedVehicle
+            };
+            localStorage.setItem('fleet_app_state', JSON.stringify(persistentState));
+        }
+
+        function loadAppState() {
+            const saved = localStorage.getItem('fleet_app_state');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    state.view = parsed.view || 'login';
+                    state.adminTab = parsed.adminTab || 'logbook';
+                    state.adminRole = parsed.adminRole || null;
+                    state.currentUser = parsed.currentUser || null;
+                    state.selectedVehicle = parsed.selectedVehicle || null;
+                } catch (e) {
+                    console.error("Error loading state:", e);
+                }
+            }
+        }
+
         async function init() {
+            loadAppState();
+            render(); // Initial render from persistent state
+
             try {
                 await signInAnonymously(auth);
                 setupRealtimeListeners();
             } catch (error) {
                 console.error("Firebase Auth Error:", error);
                 state.isLoading = false;
-                document.getElementById('app').innerHTML = `
-                    <div class="flex items-center justify-center min-h-screen">
-                        <div class="bg-white p-8 rounded-2xl max-w-sm text-center shadow-xl border border-slate-200">
-                            <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-4"></i>
-                            <h2 class="text-lg font-bold text-slate-800 mb-2">Connection Error</h2>
-                            <p class="text-sm text-slate-500">Unable to authenticate to the database. Please try again later.</p>
-                        </div>
-                    </div>`;
+                render();
             }
         }
 
@@ -645,8 +714,8 @@
                 state.view = 'vehicles';
                 state.selectedVehicle = null;
             }
-            // Rapid Render for better feel
-            requestAnimationFrame(render);
+            saveAppState();
+            render();
         }
 
         function updateDOM(id, html) {
@@ -974,43 +1043,44 @@
                     const vName = vehicle ? vehicle.makeModel : 'Unknown';
                     const dName = driver ? driver.name : 'Unknown';
                     const isSuper = state.adminRole === 'super';
- 
-                    const statusDot = log.status === 'Active' ? 'bg-emerald-500 animate-pulse' : log.status === 'Auto-Closed' ? 'bg-amber-500' : log.status === 'Force-Closed' ? 'bg-red-500' : 'bg-slate-400';
-                    const statusText = log.status === 'Active' ? 'text-emerald-600' : log.status === 'Force-Closed' ? 'text-red-600' : log.status === 'Auto-Closed' ? 'text-amber-600' : 'text-slate-500';
+                    const isGap = log.isSystemGap;
+
+                    const statusDot = log.status === 'Active' ? 'bg-emerald-500 animate-pulse' : isGap ? 'bg-indigo-400 font-bold ring-2 ring-indigo-100' : log.status === 'Auto-Closed' ? 'bg-amber-500' : log.status === 'Force-Closed' ? 'bg-red-500' : 'bg-slate-400';
+                    const statusText = log.status === 'Active' ? 'text-emerald-600' : isGap ? 'text-indigo-600' : log.status === 'Force-Closed' ? 'text-red-600' : log.status === 'Auto-Closed' ? 'text-amber-600' : 'text-slate-500';
                     const distanceHtml = (log.startingKm != null && log.endingKm != null) ? `<span class="text-slate-800 font-bold">${(Number(log.endingKm) - Number(log.startingKm)).toLocaleString()} km</span>` : '-';
                     const actionHtml = log.status === 'Active' ? `<button onclick="window.forceCloseTrip('${log.id}')" class="px-2 py-1 rounded bg-red-50 text-red-600 text-[9px] font-bold uppercase tracking-wider hover:bg-red-100 transition-colors whitespace-nowrap">Force Close</button>` : '';
                     const discrepancyIcon = log.hasDiscrepancy ? `<div class="group relative flex items-center justify-center cursor-help">
                         <i class="fas fa-exclamation-triangle text-red-500 animate-pulse"></i>
                         <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 bg-slate-800 text-white text-[9px] p-2 rounded shadow-xl z-50">Odometer Discrepancy: ${log.discrepancyGap > 0 ? '+' : ''}${log.discrepancyGap} km gap from last trip.</div>
                     </div>` : '';
- 
+
                     return `
-                    <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors text-xs text-slate-600 ${log.hasDiscrepancy ? 'bg-red-50/10' : ''}">
+                    <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors text-xs text-slate-600 ${log.hasDiscrepancy ? 'bg-red-50/10' : ''} ${isGap ? 'bg-indigo-50/20' : ''}">
                         <td class="py-4 pl-5">
                             <div class="flex items-center gap-2">
                                 <div class="w-2 h-2 rounded-full flex-shrink-0 ${statusDot}"></div>
-                                <span class="uppercase tracking-widest text-[9px] font-bold ${statusText} whitespace-nowrap">${log.status}</span>
+                                <span class="uppercase tracking-widest text-[9px] font-bold ${statusText} whitespace-nowrap">${isGap ? 'Missing Log' : log.status}</span>
                             </div>
                         </td>
-                        <td class="py-4 px-3 font-bold text-slate-800 uppercase tracking-tight whitespace-nowrap">${vName}</td>
-                        <td class="py-4 px-3 font-medium text-slate-700 uppercase whitespace-nowrap">${dName}</td>
-                        <td class="py-4 px-3 text-slate-500 overflow-hidden text-ellipsis" title="${log.purpose}">${log.purpose || '-'}</td>
+                        <td class="py-4 px-3 font-bold text-slate-800 uppercase tracking-tight whitespace-nowrap font-heading">${vName}</td>
+                        <td class="py-4 px-3 font-bold text-slate-700 uppercase whitespace-nowrap">${isGap ? `<span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-600 text-[8px] tracking-widest font-black uppercase">System</span>` : dName}</td>
+                        <td class="py-4 px-3 text-slate-500 overflow-hidden text-ellipsis italic" title="${log.purpose}">${log.purpose || '-'}</td>
                         <td class="py-4 px-3 text-slate-500 whitespace-nowrap font-medium">
                             <div class="flex items-center gap-1.5">
                                 ${log.startingKm != null ? log.startingKm + ' km' : '-'}
                                 ${discrepancyIcon}
                             </div>
                         </td>
-                        <td class="py-4 px-3 text-blue-600 font-medium whitespace-nowrap">${log.endingKm != null ? log.endingKm + ' km' : '-'}</td>
+                        <td class="py-4 px-3 text-blue-600 font-bold whitespace-nowrap">${log.endingKm != null ? log.endingKm + ' km' : '-'}</td>
                         <td class="py-4 px-3 whitespace-nowrap">${distanceHtml}</td>
                         <td class="py-4 px-3 text-slate-500 overflow-hidden text-ellipsis" title="${log.notes || ''}">${log.notes || '-'}</td>
                         <td class="py-4 px-3 text-slate-400 whitespace-nowrap font-medium">${formatDate(log.startTime)}</td>
                         <td class="py-4 px-3 text-slate-400 whitespace-nowrap font-medium">${formatDate(log.endTime)}</td>
-                        <td class="py-4 pr-5">
+                        <td class="py-4 pr-5 text-right">
                             <div class="flex items-center gap-2 justify-end">
                                 ${actionHtml}
-                                <button onclick="window.editLog('${log.id}')" class="text-slate-300 hover:text-blue-600 transition-colors p-1"><i class="fas fa-edit"></i></button>
-                                ${isSuper ? `<button onclick="window.deleteLog('${log.id}')" class="text-slate-300 hover:text-red-600 transition-colors p-1"><i class="fas fa-trash"></i></button>` : ''}
+                                <button onclick="window.openEditLogModal('${log.id}')" class="text-slate-300 hover:text-blue-600 transition-colors p-1.5 bg-slate-50 rounded-lg shadow-sm"><i class="fas fa-edit text-xs"></i></button>
+                                ${isSuper ? `<button onclick="window.deleteLog('${log.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1.5 bg-slate-50 rounded-lg shadow-sm"><i class="fas fa-trash text-xs"></i></button>` : ''}
                             </div>
                         </td>
                     </tr>`;
@@ -1271,6 +1341,14 @@
                                     ${adminList.length > 0 ? adminList : `<div class="py-12 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">No regular admins configured</div>`}
                                 </div>
                             </div>
+
+                            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2 uppercase tracking-wide text-xs"><i class="fas fa-broom text-amber-500"></i> Database Maintenance</h3>
+                                <p class="text-[10px] text-slate-500 mb-4 leading-relaxed font-medium">Repair overlapping logs and fix data integrity issues. This will automatically trim trips that were left active while others were in progress.</p>
+                                <button onclick="window.runDataCleanup()" class="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold font-heading text-xs tracking-widest uppercase transition-all shadow-md flex items-center justify-center gap-2">
+                                    <i class="fas fa-wand-magic-sparkles"></i> Clean & Repair Logs
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>`;
@@ -1322,6 +1400,7 @@
                 input.value = '';
                 // Re-trigger snapshots to get the real PINs for Super Admin
                 setupRealtimeListeners();
+                saveAppState();
                 render();
             } else {
                 try {
@@ -1332,6 +1411,7 @@
                         state.view = 'admin';
                         state.adminRole = 'regular';
                         input.value = '';
+                        saveAppState();
                         render();
                         return;
                     }
@@ -1402,14 +1482,17 @@
         };
 
         // --- Trip Actions ---
-         window.openStartModal = (vid) => {
+         window.openStartModal = async (vid) => {
             state.selectedVehicle = state.vehicles.find(v => v.id === vid);
             if(!state.selectedVehicle) return;
  
-            // Fetch last known odometer
-            const lastLog = state.logs.filter(l => l.vehicleId === vid && l.endingKm != null)
-                             .sort((a,b) => new Date(b.endTime) - new Date(a.endTime))[0];
-            const lastKm = lastLog ? lastLog.endingKm : 0;
+            // Fetch last known odometer from server (more reliable than local cache)
+            let lastKm = 0;
+            try {
+                const q = query(getCol('logs'), where('vehicleId', '==', vid), where('status', 'in', ['Closed', 'Auto-Closed', 'Force-Closed']));
+                const snap = await getDocs(q);
+                lastKm = snap.docs.reduce((max, d) => Math.max(max, d.data().endingKm || 0), 0);
+            } catch(e) { console.error(e); }
  
             const isTakeover = state.selectedVehicle.status === 'In Use';
             const modalText = document.getElementById('start-modal-text');
@@ -1426,51 +1509,71 @@
             }
  
             window.openModal('start-modal', 'start-modal-content');
+            saveAppState();
         };
         window.confirmStartDriving = async () => {
             const v = state.selectedVehicle;
             const purpose = document.getElementById('purpose-input').value.trim();
             const startKm = document.getElementById('start-km-input').value.trim();
- 
+
             if(!v) return;
             if(!startKm) { window.showToast('Please enter Starting KM', true); return; }
             if(isNaN(Number(startKm))) { window.showToast('Starting KM must be a number', true); return; }
             if(!purpose) { window.showToast('Please enter a purpose', true); return; }
- 
-            const isTakeover = v.status === 'In Use';
+
             const enterKmNum = Number(startKm);
 
             try {
-                // Quick optimistic UI update
+                // Show loader immediately
                 document.getElementById('start-form').classList.add('hidden');
                 document.getElementById('start-success').classList.remove('hidden');
                 document.getElementById('start-success').classList.add('flex');
 
-                // â”€â”€â”€ TAKEOVER: Auto-close previous driver's trip with the entered KM â”€â”€â”€
-                if (isTakeover) {
-                    const prevLog = state.logs.find(l => l.vehicleId === v.id && l.status === 'Active');
-                    if (prevLog) {
-                        await updateDoc(getDocRef('logs', prevLog.id), {
-                            status: 'Auto-Closed',
-                            endTime: new Date().toISOString(),
-                            endingKm: enterKmNum
-                        });
-                    }
-                }
-                // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // OFFLINE-SAFE LOGIC: Use local state/cache for validation
+                const lastEndKm = state.logs.filter(l => l.vehicleId === v.id && l.endingKm != null)
+                                     .reduce((max, d) => Math.max(max, d.endingKm || 0), 0);
 
+                if (enterKmNum < lastEndKm) {
+                    throw `ERROR: Odometer mismatch. Vehicle was last recorded at ${lastEndKm} KM. Current entry (${enterKmNum}) is lower and has been blocked.`;
+                }
+
+                // 1. GAP DETECTION: Create a "Missing Log" if there's an upward jump
+                if (enterKmNum > lastEndKm) {
+                    await addDoc(getCol('logs'), {
+                        vehicleId: v.id,
+                        driverId: 'system',
+                        driverName: '[MISSING LOG]',
+                        startTime: new Date().toISOString(),
+                        endTime: new Date().toISOString(),
+                        status: 'Auto-Closed',
+                        purpose: 'Unrecorded mileage detected between trips.',
+                        startingKm: lastEndKm,
+                        endingKm: enterKmNum,
+                        isSystemGap: true,
+                        notes: 'System-generated gap filler (Offline Recorded).'
+                    });
+                }
+
+                // 2. Find and Auto-Close ALL active logs for this vehicle
+                const activeQuery = query(getCol('logs'), where('vehicleId', '==', v.id), where('status', '==', 'Active'));
+                const activeSnap = await getDocs(activeQuery);
+                
+                for (const logDoc of activeSnap.docs) {
+                    await updateDoc(logDoc.ref, {
+                        status: 'Auto-Closed',
+                        endTime: new Date().toISOString(),
+                        endingKm: enterKmNum,
+                        notes: (logDoc.data().notes ? logDoc.data().notes + " | " : "") + `Auto-closed; End KM recorded by ${state.currentUser.name}`
+                    });
+                }
+
+                // 3. Update Vehicle Status
                 await updateDoc(getDocRef('vehicles', v.id), {
                     status: 'In Use',
                     currentDriverId: state.currentUser.id
                 });
 
-                // Detect Discrepancy
-                const lastLog = state.logs.filter(l => l.vehicleId === v.id && l.endingKm != null)
-                                 .sort((a,b) => new Date(b.endTime) - new Date(a.endTime))[0];
-                const lastEndKm = lastLog ? lastLog.endingKm : enterKmNum;
-                const hasDiscrepancy = enterKmNum !== lastEndKm;
-                const discrepancyGap = enterKmNum - lastEndKm;
- 
+                // 4. Create the New Log
                 await addDoc(getCol('logs'), {
                     vehicleId: v.id,
                     driverId: state.currentUser.id,
@@ -1480,25 +1583,26 @@
                     purpose: purpose,
                     startingKm: enterKmNum,
                     endingKm: null,
-                    hasDiscrepancy: hasDiscrepancy,
-                    discrepancyGap: discrepancyGap
+                    hasDiscrepancy: enterKmNum !== lastEndKm,
+                    discrepancyGap: enterKmNum - lastEndKm
                 });
- 
 
+                // Success Feedback
                 setTimeout(() => {
                     window.closeModal('start-modal', 'start-modal-content');
                     setTimeout(() => {
                         document.getElementById('start-form').classList.remove('hidden');
                         document.getElementById('start-success').classList.add('hidden');
-                        document.getElementById('start-success').classList.remove('flex');
                         document.getElementById('purpose-input').value = '';
                         document.getElementById('start-km-input').value = '';
+                        handleAutoBypass();
                     }, 300);
+                    if (!isOnline) window.showToast('Offline: Trip started. Will sync when online.');
                 }, 300);
 
             } catch(e) {
                 console.error(e);
-                window.showToast('Error starting trip', true);
+                window.showToast(typeof e === 'string' ? e : 'Error starting trip', true);
                 // Reset modal on error
                 document.getElementById('start-form').classList.remove('hidden');
                 document.getElementById('start-success').classList.add('hidden');
@@ -1516,65 +1620,80 @@
             const notes = document.getElementById('trip-notes-input').value.trim();
             if(!v) return;
             if(!km || isNaN(Number(km))) { window.showToast('Please enter a valid Ending KM', true); return; }
-            const activeLog = state.logs.find(l => l.vehicleId === v.id && l.status === 'Active');
-            if(activeLog) {
-                const endKmNum = Number(km);
+            
+            const endKmNum = Number(km);
+
+            try {
+                document.getElementById('stop-form').classList.add('hidden');
+                document.getElementById('stop-success').classList.remove('hidden');
+                document.getElementById('stop-success').classList.add('flex');
+
+                // 1. Find the active log for this user/vehicle (Uses local state/cache if offline)
+                const activeQuery = query(getCol('logs'), 
+                    where('vehicleId', '==', v.id), 
+                    where('driverId', '==', state.currentUser.id),
+                    where('status', '==', 'Active')
+                );
+                const activeSnap = await getDocs(activeQuery);
+                if (activeSnap.empty) throw "No active trip found for this vehicle.";
+                
+                const activeLog = activeSnap.docs[0].data();
+                const activeLogRef = activeSnap.docs[0].ref;
+
                 if (endKmNum < activeLog.startingKm) {
-                    window.showToast(`Error: Odometer cannot be less than start (${activeLog.startingKm})`, true);
-                    return;
+                    throw `Error: Odometer cannot be less than start (${activeLog.startingKm})`;
                 }
- 
-                try {
-                    document.getElementById('stop-form').classList.add('hidden');
-                    document.getElementById('stop-success').classList.remove('hidden');
-                    document.getElementById('stop-success').classList.add('flex');
- 
-                    await updateDoc(getDocRef('vehicles', v.id), {
-                        status: 'Available',
-                        currentDriverId: null
-                    });
- 
-                    await updateDoc(getDocRef('logs', activeLog.id), {
-                        status: 'Closed',
-                        endTime: new Date().toISOString(),
-                        endingKm: endKmNum,
-                        notes: notes || null
-                    });
-                    
- 
+
+                // 2. Update Vehicle Status
+                await updateDoc(getDocRef('vehicles', v.id), {
+                    status: 'Available',
+                    currentDriverId: null
+                });
+
+                // 3. Update Log
+                await updateDoc(activeLogRef, {
+                    status: 'Closed',
+                    endTime: new Date().toISOString(),
+                    endingKm: endKmNum,
+                    notes: notes || (activeLog.notes || null)
+                });
+
+                // Success Feedback
+                setTimeout(() => {
+                    window.closeModal('stop-modal', 'stop-modal-content');
                     setTimeout(() => {
-                        window.closeModal('stop-modal', 'stop-modal-content');
-                        setTimeout(() => {
-                            document.getElementById('stop-form').classList.remove('hidden');
-                            document.getElementById('stop-success').classList.add('hidden');
-                            document.getElementById('stop-success').classList.remove('flex');
-                            document.getElementById('ending-km-input').value = '';
-                            document.getElementById('trip-notes-input').value = '';
-                            state.selectedVehicle = null;
-                            handleAutoBypass();
-                        }, 300);
-                    }, 500);
- 
-                } catch(e) {
-                    console.error(e);
-                    window.showToast('Error securing vehicle', true);
-                    document.getElementById('stop-form').classList.remove('hidden');
-                    document.getElementById('stop-success').classList.add('hidden');
-                    document.getElementById('stop-success').classList.remove('flex');
-                }
+                        document.getElementById('stop-form').classList.remove('hidden');
+                        document.getElementById('stop-success').classList.add('hidden');
+                        document.getElementById('ending-km-input').value = '';
+                        document.getElementById('trip-notes-input').value = '';
+                        state.selectedVehicle = null;
+                        handleAutoBypass();
+                    }, 300);
+                    if (!isOnline) window.showToast('Offline: Vehicle secured. Will sync when online.');
+                }, 500);
+
+            } catch(e) {
+                console.error(e);
+                window.showToast(typeof e === 'string' ? e : 'Error securing vehicle', true);
+                document.getElementById('stop-form').classList.remove('hidden');
+                document.getElementById('stop-success').classList.add('hidden');
+                document.getElementById('stop-success').classList.remove('flex');
             }
         };
 
         window.logout = () => {
             state.currentUser = null;
-            state.selectedVehicle = null;
             state.view = 'login';
+            state.adminRole = null;
+            saveAppState();
             render();
         };
 
  
         window.exitAdmin = () => {
             state.view = 'login';
+            state.adminRole = null;
+            saveAppState();
             render();
         };
  
@@ -1598,8 +1717,61 @@
                 window.showToast('Trip force-closed successfully');
             } catch(e) {
                 console.error(e);
-                window.showToast('Error closing trip', true);
+                window.showToast('Error force-closing trip', true);
             }
+        };
+
+        window.openEditLogModal = (logId) => {
+            const log = state.logs.find(l => l.id === logId);
+            if (!log) return;
+            state.editingLogId = logId;
+
+            // Populate Drivers in select
+            const select = document.getElementById('edit-log-driver-select');
+            select.innerHTML = state.drivers.map(d => `<option value="${d.id}" ${d.id === log.driverId ? 'selected' : ''}>${d.name}</option>`).join('');
+            
+            // Add "Unknown/System" option if it's a gap
+            if (log.isSystemGap) {
+                select.innerHTML = `<option value="system" selected disabled>[SYSTEM] MISSING LOG</option>` + select.innerHTML;
+            }
+
+            document.getElementById('edit-log-purpose').value = log.purpose || '';
+            window.openModal('edit-log-modal', 'edit-log-content');
+        };
+
+        window.confirmEditLog = async () => {
+            const logId = state.editingLogId;
+            const log = state.logs.find(l => l.id === logId);
+            const driverId = document.getElementById('edit-log-driver-select').value;
+            const purpose = document.getElementById('edit-log-purpose').value.trim();
+
+            if (!logId || !log) return;
+            if (driverId === 'system' && log.isSystemGap) {
+                window.showToast('Please assign a real driver', true);
+                return;
+            }
+
+            try {
+                const driver = state.drivers.find(d => d.id === driverId);
+                const updateData = {
+                    driverId: driverId,
+                    purpose: purpose,
+                    isSystemGap: false, // Mark as no longer a "missing" gap once assigned
+                    status: 'Closed',
+                    notes: (log.notes ? log.notes + " | " : "") + `Admin Edited: ${new Date().toLocaleString()}`
+                };
+
+                await updateDoc(getDocRef('logs', logId), updateData);
+                window.showToast('Log record updated');
+                window.closeModal('edit-log-modal', 'edit-log-content');
+            } catch(e) {
+                console.error(e);
+                window.showToast('Error updating log', true);
+            }
+        };
+
+        window.deleteLog = async (logId) => {
+
         };
 
         window.setAdminTab = (tab) => {
@@ -1774,6 +1946,84 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+        };
+
+        window.runDataCleanup = async () => {
+            if (state.adminRole !== 'super') { window.showToast('Super Admin access required', true); return; }
+            if (!confirm('This will scan all logs and automatically trim overlaps (both odometer and driver time). Continue?')) return;
+            
+            window.showToast('Scanning database...');
+            try {
+                const logsSnap = await getDocs(getCol('logs'));
+                const allLogs = logsSnap.docs.map(d => ({ id: d.id, ...d.data(), ref: d.ref }));
+                const updates = [];
+
+                // --- PHASE 1: DRIVER CONSISTENCY ---
+                const byDriver = {};
+                allLogs.forEach(l => {
+                    if (!byDriver[l.driverId]) byDriver[l.driverId] = [];
+                    byDriver[l.driverId].push(l);
+                });
+
+                for (const did in byDriver) {
+                    const dLogs = byDriver[did].sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+                    for (let i = 0; i < dLogs.length - 1; i++) {
+                        const current = dLogs[i];
+                        const next = dLogs[i+1];
+                        const currEnd = current.endTime ? new Date(current.endTime) : new Date();
+                        const nextStart = new Date(next.startTime);
+
+                        if (currEnd > nextStart) {
+                            updates.push({ 
+                                ref: current.ref, 
+                                data: { status: 'Auto-Closed', endTime: next.startTime, notes: (current.notes ? current.notes + " | " : "") + "System Repair: Driver Switch" } 
+                            });
+                        }
+                    }
+                }
+
+                // --- PHASE 2: VEHICLE ODOMETER CONSISTENCY ---
+                const byVehicle = {};
+                allLogs.forEach(l => {
+                    if (!byVehicle[l.vehicleId]) byVehicle[l.vehicleId] = [];
+                    byVehicle[l.vehicleId].push(l);
+                });
+
+                for (const vid in byVehicle) {
+                    const vLogs = byVehicle[vid].sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+                    for (let i = 0; i < vLogs.length - 1; i++) {
+                        const current = vLogs[i];
+                        const next = vLogs[i+1];
+                        const currentEnd = current.endingKm;
+                        const nextStart = next.startingKm || 0;
+
+                        if (current.status === 'Active' || (currentEnd != null && currentEnd > nextStart)) {
+                            updates.push({ 
+                                ref: current.ref, 
+                                data: { status: 'Auto-Closed', endTime: next.startTime, endingKm: nextStart, notes: (current.notes ? current.notes + " | " : "") + "System Repair: Odometer Overlap" } 
+                            });
+                        }
+                    }
+                }
+
+                // Execute batch deduplicated updates
+                const uniqueUpdates = {};
+                updates.forEach(u => {
+                    uniqueUpdates[u.ref.id] = { ... (uniqueUpdates[u.ref.id] || {}), ...u.data };
+                });
+
+                let repairCount = 0;
+                for (const id in uniqueUpdates) {
+                    await updateDoc(doc(getCol('logs'), id), uniqueUpdates[id]);
+                    repairCount++;
+                }
+                
+                window.showToast(`Cleanup Complete. ${repairCount} logs repaired.`);
+                render();
+            } catch(e) {
+                console.error(e);
+                window.showToast('Cleanup Error', true);
+            }
         };
 
         window.exportPDF = () => {
