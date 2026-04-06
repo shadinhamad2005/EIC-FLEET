@@ -1590,8 +1590,11 @@
                     currentDriverId: state.currentUser.id
                 });
 
-                // 4. Create the New Log
-                await addDoc(getCol('logs'), {
+                // 4. Create the New Log with a PERSISTENT ID (so we can update it offline later)
+                const newLogRef = doc(getCol('logs')); // Pre-generates a unique firestore ID
+                const logId = newLogRef.id;
+
+                await setDoc(newLogRef, {
                     vehicleId: v.id,
                     driverId: state.currentUser.id,
                     startTime: new Date().toISOString(),
@@ -1611,9 +1614,9 @@
                     state.vehicles[vIdx].currentDriverId = state.currentUser.id;
                 }
                 
-                // Add a temporary local log so find works immediately
+                // Add a temporary local log with the REAL Firestore ID we just generated
                 const tempLog = {
-                    id: 'temp-' + Date.now(),
+                    id: logId,
                     vehicleId: v.id,
                     driverId: state.currentUser.id,
                     status: 'Active',
@@ -1669,10 +1672,9 @@
                 document.getElementById('stop-success').classList.remove('hidden');
                 document.getElementById('stop-success').classList.add('flex');
 
-                // 1. Find the active log for this user/vehicle (Uses local state for reliability)
+                // 1. Find the active log for this vehicle (Relaxed search for offline robustness)
                 const activeLogEntry = state.logs.find(log => 
                     log.vehicleId === v.id && 
-                    log.driverId === state.currentUser.id && 
                     log.status === 'Active'
                 );
                 
