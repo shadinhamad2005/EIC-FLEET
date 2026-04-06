@@ -1628,17 +1628,17 @@
                 document.getElementById('stop-success').classList.remove('hidden');
                 document.getElementById('stop-success').classList.add('flex');
 
-                // 1. Find the active log for this user/vehicle (Uses local state/cache if offline)
-                const activeQuery = query(getCol('logs'), 
-                    where('vehicleId', '==', v.id), 
-                    where('driverId', '==', state.currentUser.id),
-                    where('status', '==', 'Active')
+                // 1. Find the active log for this user/vehicle (Uses local state for reliability)
+                const activeLogEntry = state.logs.find(log => 
+                    log.vehicleId === v.id && 
+                    log.driverId === state.currentUser.id && 
+                    log.status === 'Active'
                 );
-                const activeSnap = await getDocs(activeQuery);
-                if (activeSnap.empty) throw "No active trip found for this vehicle.";
                 
-                const activeLog = activeSnap.docs[0].data();
-                const activeLogRef = activeSnap.docs[0].ref;
+                if (!activeLogEntry) throw "No active trip found for this vehicle.";
+                
+                const activeLog = activeLogEntry;
+                const activeLogRef = getDocRef('logs', activeLog.id);
 
                 if (endKmNum < activeLog.startingKm) {
                     throw `Error: Odometer cannot be less than start (${activeLog.startingKm})`;
