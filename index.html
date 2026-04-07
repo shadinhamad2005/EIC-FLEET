@@ -588,14 +588,19 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Next Oil Change
-                        (KM)</label>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Next Oil Change (KM)</label>
                     <input type="number" id="new-vehicle-oil" placeholder="e.g., 55000"
                         class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all text-sm font-bold">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Vehicle Photo
-                        <span class="text-slate-400 font-normal">(Optional)</span></label>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Primary Responsible Driver <span class="text-slate-400 font-normal">(Optional)</span></label>
+                    <select id="new-vehicle-primary-driver" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none text-slate-800 transition-all text-sm font-bold">
+                        <option value="">No Assigned Primary Driver</option>
+                    </select>
+                    <p class="text-[10px] text-slate-500 mt-2 font-medium">Unrecorded kilometers will be automatically attributed to this driver.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Vehicle Photo <span class="text-slate-400 font-normal">(Optional)</span></label>
                     <input type="file" id="new-vehicle-photo-file" accept="image/*"
                         class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:outline-none text-slate-600 transition-all text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer">
                     <input type="hidden" id="new-vehicle-photo">
@@ -696,7 +701,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { initializeFirestore, persistentLocalCache, collection, onSnapshot, doc, updateDoc, addDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, persistentLocalCache, collection, onSnapshot, doc, updateDoc, addDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, runTransaction, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase config
         const firebaseConfig = {
@@ -953,6 +958,11 @@
             const start = document.getElementById('edit-log-start').value;
             const end = document.getElementById('edit-log-end').value;
             const purpose = document.getElementById('edit-log-purpose').value.trim();
+
+            if (start && end && Number(end) < Number(start)) {
+                window.showToast('Ending KM cannot be less than Starting KM', true);
+                return;
+            }
 
             try {
                 await updateDoc(getDocRef('logs', id), {
@@ -1463,7 +1473,11 @@
                         </div>
                         <div class="flex-1 min-w-0">
                             <h3 class="text-sm font-bold text-slate-800 uppercase truncate">${d.name}</h3>
-                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Driver Account</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none">Driver Account</p>
+                                <span class="w-1 h-1 rounded-full bg-slate-200"></span>
+                                <p class="text-[10px] text-blue-600 font-bold uppercase tracking-widest leading-none">${state.logs.filter(l => l.driverId === d.id).reduce((sum, l) => sum + ((l.startingKm != null && l.endingKm != null) ? (l.endingKm - l.startingKm) : 0), 0).toLocaleString()} KM</p>
+                            </div>
                         </div>
                         <div class="flex gap-1">
                             ${state.adminRole === 'super' ? `
@@ -1500,7 +1514,10 @@
                     const dLogs = state.logs.filter(l => l.driverId === d.id);
                     const dKm = dLogs.reduce((sum, l) => sum + ((l.startingKm != null && l.endingKm != null) ? (l.endingKm - l.startingKm) : 0), 0);
                     return { name: d.name, trips: dLogs.length, km: dKm };
-                }).sort((a, b) => b.trips - a.trips);
+                });
+                
+                const driverStatsByTrips = [...driverStats].sort((a, b) => b.trips - a.trips);
+                const driverStatsByKm = [...driverStats].sort((a, b) => b.km - a.km);
 
                 contentHtml = `
                 <div class="slide-up">
@@ -1563,22 +1580,25 @@
                             </div>
                         </div>
  
-                        <!-- Driver Participation -->
+                        <!-- Driver Performance -->
                         <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                             <h3 class="font-bold text-slate-800 mb-6 flex items-center justify-between uppercase tracking-wide text-xs">
-                                <span><i class="fas fa-user-friends text-blue-500 mr-2"></i> Driver Participation (Trips)</span>
-                                <span class="text-[9px] text-slate-400 font-normal">Trip Count</span>
+                                <span><i class="fas fa-user-friends text-blue-500 mr-2"></i> Driver Performance (KM)</span>
+                                <span class="text-[9px] text-slate-400 font-normal">Sorted by Total Distance</span>
                             </h3>
                             <div class="space-y-4">
-                                ${driverStats.map(ds => `
+                                ${driverStatsByKm.map(ds => `
                                     <div class="flex items-center gap-4">
                                         <div class="flex-1">
                                             <div class="flex justify-between text-[11px] mb-1.5">
                                                 <span class="font-bold text-slate-700 uppercase tracking-tight">${ds.name}</span>
-                                                <span class="text-slate-500 font-medium">${ds.trips} Trips</span>
+                                                <div class="flex gap-3">
+                                                    <span class="text-[9px] text-slate-400 uppercase font-bold">${ds.trips} Trips</span>
+                                                    <span class="text-slate-800 font-bold">${ds.km.toLocaleString()} KM</span>
+                                                </div>
                                             </div>
                                             <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                <div class="bg-emerald-500 h-full rounded-full" style="width: ${totalTrips > 0 ? (ds.trips / totalTrips * 100) : 0}%"></div>
+                                                <div class="bg-emerald-500 h-full rounded-full" style="width: ${totalKm > 0 ? (ds.km / totalKm * 100) : 0}%"></div>
                                             </div>
                                         </div>
                                     </div>
@@ -1697,7 +1717,7 @@
             const pin = input.value.trim();
 
             if (pin.length < 4) {
-                window.showToast("Please enter at least a 4-digit PIN", true);
+                window.showToast("Please enter at least a 4-digit PIN", "ദയവായി കുറഞ്ഞത് 4 അക്കമുള്ള പിൻ നമ്പർ നൽകുക", true);
                 return;
             }
 
@@ -1711,6 +1731,8 @@
                 setupRealtimeListeners();
                 saveAppState();
                 render();
+                // Task: Silent background repair on super-admin entry
+                setTimeout(() => window.runDataCleanup(true), 1000);
             } else {
                 try {
                     // Check Admins
@@ -1737,12 +1759,12 @@
                     }
 
                     recordLoginAttempt(false);
-                    window.showToast("Invalid PIN", true);
+                    window.showToast("Invalid PIN", "നൽകിയ പിൻ തെറ്റാണ്", true);
                     input.value = '';
                     input.focus();
                 } catch (e) {
                     console.error(e);
-                    window.showToast("Login Error", true);
+                    window.showToast("Login Error", "ലോഗിൻ ചെയ്യുന്നതിൽ പിശക് സംഭവിച്ചു", true);
                 }
             }
         };
@@ -1779,15 +1801,26 @@
             }, 300);
         };
 
-        window.showToast = (msg, isError = false) => {
+        window.showToast = (en, ml = '', isError = false) => {
             const toastEl = document.getElementById('toast');
             if (!toastEl) return;
-            toastEl.textContent = msg;
-            toastEl.className = `fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3.5 rounded-full shadow-lg text-sm font-medium transition-all duration-300 z-[100] flex items-center justify-center pointer-events-none min-w-[280px] ${isError ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'}`;
-            setTimeout(() => toastEl.classList.remove('-translate-y-4', 'opacity-0'), 10);
-            setTimeout(() => {
-                toastEl.classList.add('-translate-y-4', 'opacity-0');
-            }, 3000);
+            toastEl.innerHTML = `
+                <div class="flex flex-col items-center text-center">
+                    <span class="font-bold">${en}</span>
+                    ${ml ? `<span class="text-[10px] opacity-80 mt-0.5 font-medium">${ml}</span>` : ''}
+                </div>
+            `;
+            toastEl.className = `fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3.5 rounded-2xl shadow-xl text-sm font-medium transition-all duration-300 z-[100] flex items-center justify-center pointer-events-none min-w-[300px] ${isError ? 'bg-red-600 text-white' : 'bg-slate-800 text-white'}`;
+            toastEl.style.opacity = '1';
+            toastEl.style.transform = 'translateX(-50%) translateY(0)';
+            
+            // Clear existing timeout if any
+            if (window._toastTimeout) clearTimeout(window._toastTimeout);
+            
+            window._toastTimeout = setTimeout(() => {
+                toastEl.style.opacity = '0';
+                toastEl.style.transform = 'translateX(-50%) translateY(-20px)';
+            }, 4000);
         };
 
         // --- Trip Actions ---
@@ -1823,110 +1856,137 @@
         window.confirmStartDriving = async () => {
             const v = state.selectedVehicle;
             const purpose = document.getElementById('purpose-input').value.trim();
-            const startKm = document.getElementById('start-km-input').value.trim();
+            const startKmInput = document.getElementById('start-km-input').value.trim();
+            const startBtn = document.querySelector('#start-modal button[onclick*="confirmStartDriving"]');
 
-            if (!v) return;
-            if (!startKm || isNaN(Number(startKm))) { window.showToast('Please enter Starting KM', true); return; }
-            if (!purpose) { window.showToast('Please enter a trip purpose', true); return; }
-
-            const enterKmNum = Number(startKm);
-            const lastEndKm = v.lastEndKm || 0;
-
-            // --- ZERO LATENCY UI: Start transition IMMEDIATELY ---
-            const newLogRef = doc(getCol('logs'));
-            const logId = newLogRef.id;
-            const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
-
-            if (vIdx > -1) {
-                state.vehicles[vIdx].status = 'In Use';
-                state.vehicles[vIdx].currentDriverId = state.currentUser.id;
-                state.vehicles[vIdx].activeLogId = logId;
+            if (!v || !state.currentUser) return;
+            if (!startKmInput || isNaN(Number(startKmInput))) { 
+                window.showToast('Please enter Starting KM', 'ദയവായി തുടങ്ങുന്ന കിലോമീറ്റർ രേഖപ്പെടുത്തുക', true); 
+                return; 
+            }
+            if (!purpose) { 
+                window.showToast('Please enter a trip purpose', 'ദയവായി യാത്രയുടെ ഉദ്ദേശം രേഖപ്പെടുത്തുക', true); 
+                return; 
             }
 
-            state.selectedVehicle = state.vehicles[vIdx] || v;
-            state.view = 'active_trip';
+            const enterKmNum = Number(startKmInput);
+            
+            // UI Loading state
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Starting...`;
+            }
 
-            // Add to logs immediately
-            state.logs.unshift({
-                id: logId,
-                vehicleId: v.id,
-                driverId: state.currentUser.id,
-                status: 'Active',
-                startingKm: enterKmNum,
-                startTime: new Date().toISOString(),
-                purpose: purpose
-            });
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const vRef = getDocRef('vehicles', v.id);
+                    const vSnap = await transaction.get(vRef);
+                    const vData = vSnap.data();
 
-            saveAppState();
-            render(); // Transition happens HERE, instantly
+                    const dRef = getDocRef('drivers', state.currentUser.id);
+                    const dSnap = await transaction.get(dRef);
+                    const dData = dSnap.data();
 
-            // Success Feedback (Instant transition is done, we just tidy up the modal)
-            window.closeModal('start-modal', 'start-modal-content');
-            setTimeout(() => {
-                document.getElementById('start-form').classList.remove('hidden');
-                document.getElementById('purpose-input').value = '';
-                document.getElementById('start-km-input').value = '';
-            }, 300);
-
-            // --- BACKGROUND SYNC: Perform Firebase writes asynchronously (Burst Mode) ---
-            state.isSyncing = true;
-            state.pendingWrites++;
-            render();
-
-            const syncBurst = async () => {
-                const promises = [];
-                try {
-                    // 1. Gap Filler (Background)
-                    if (enterKmNum > lastEndKm) {
-                        promises.push(addDoc(getCol('logs'), {
-                            vehicleId: v.id,
-                            driverId: 'system',
-                            driverName: '[OFFLINE GAP]',
-                            startTime: new Date().toISOString(),
-                            endTime: new Date().toISOString(),
-                            status: 'Auto-Closed',
-                            purpose: 'Unrecorded mileage (Offline-to-Online Sync)',
-                            startingKm: lastEndKm,
-                            endingKm: enterKmNum,
-                            isSystemGap: true
-                        }));
+                    // 1. Double-Booking Logic (Vehicle)
+                    if (vData.status === 'In Use' && vData.currentDriverId !== state.currentUser.id) {
+                        throw { 
+                            en: "Vehicle is currently in use by someone else", 
+                            ml: "ഈ വാഹനം നിലവിൽ മറ്റൊരാൾ ഉപയോഗിച്ചുകൊണ്ടിരിക്കുകയാണ്" 
+                        };
                     }
 
-                    // 2. Vehicle Status Update
-                    promises.push(updateDoc(getDocRef('vehicles', v.id), {
-                        status: 'In Use',
-                        currentDriverId: state.currentUser.id,
-                        activeLogId: logId
-                    }));
+                    // 2. Double-Booking Logic (Driver)
+                    // (We check if driver has an existing active trip)
+                    const activeTripsQuery = query(getCol('logs'), where('driverId', '==', state.currentUser.id), where('status', '==', 'Active'), limit(1));
+                    const activeTripsSnap = await getDocs(activeTripsQuery);
+                    if (!activeTripsSnap.empty) {
+                        const activeLog = activeTripsSnap.docs[0].data();
+                        if (activeLog.vehicleId !== v.id) {
+                            throw { 
+                                en: "You already have an active trip on another vehicle", 
+                                ml: "നിങ്ങൾക്ക് നിലവിൽ മറ്റൊരു വാഹനത്തിൽ ട്രിപ്പ് സജീവമാണ്" 
+                            };
+                        }
+                    }
 
-                    // 3. Log Creation
-                    promises.push(setDoc(newLogRef, {
+                    const lastEndKm = vData.lastEndKm || 0;
+                    const lastEndTime = vData.lastEndTime || new Date().toISOString();
+                    const now = new Date().toISOString();
+
+                    // 3. Gap Reconciliation Logic: Attribution to Primary Driver
+                    if (enterKmNum > lastEndKm) {
+                        let attributedDriverId = 'system';
+                        let attributedDriverName = '[SYSTEM GAP]';
+                        let attributionPurpose = 'Unrecorded mileage gap reconciliation';
+
+                        // If vehicle has a primary driver and it's NOT the current person taking it,
+                        // attribute the gap to that primary driver.
+                        if (vData.primaryDriverId && vData.primaryDriverId !== state.currentUser.id) {
+                            const pDriver = state.drivers.find(d => d.id === vData.primaryDriverId);
+                            attributedDriverId = vData.primaryDriverId;
+                            attributedDriverName = pDriver ? pDriver.name : 'Primary Driver';
+                            attributionPurpose = 'Assigned primary usage - Automatic Handover';
+                        }
+
+                        const gapLogRef = doc(getCol('logs'));
+                        transaction.set(gapLogRef, {
+                            vehicleId: v.id,
+                            driverId: attributedDriverId,
+                            driverName: attributedDriverName,
+                            startTime: lastEndTime,
+                            endTime: now,
+                            status: 'Closed',
+                            purpose: attributionPurpose,
+                            startingKm: lastEndKm,
+                            endingKm: enterKmNum,
+                            isSystemGap: !vData.primaryDriverId,
+                            createdAt: serverTimestamp()
+                        });
+                    }
+
+                    // 4. Create New Trip Log
+                    const newLogRef = doc(getCol('logs'));
+                    transaction.set(newLogRef, {
                         vehicleId: v.id,
                         driverId: state.currentUser.id,
-                        startTime: new Date().toISOString(),
+                        driverName: state.currentUser.name,
+                        startTime: now,
                         endTime: null,
                         status: 'Active',
                         purpose: purpose,
                         startingKm: enterKmNum,
                         endingKm: null,
-                        hasDiscrepancy: enterKmNum !== lastEndKm,
-                        discrepancyGap: enterKmNum - lastEndKm
-                    }));
+                        createdAt: serverTimestamp()
+                    });
 
-                    await Promise.all(promises);
-                } catch (e) {
-                    console.warn("Background Sync Warning (Start):", e);
-                } finally {
-                    state.pendingWrites--;
-                    if (state.pendingWrites <= 0) {
-                        state.pendingWrites = 0;
-                        state.isSyncing = false;
-                    }
-                    render();
+                    // 5. Update Vehicle Status
+                    transaction.update(vRef, {
+                        status: 'In Use',
+                        currentDriverId: state.currentUser.id,
+                        activeLogId: newLogRef.id,
+                        lastEndKm: enterKmNum // Anticipatory update
+                    });
+                });
+
+                // SUCCESS UI TRANSITION
+                window.closeModal('start-modal', 'start-modal-content');
+                state.view = 'active_trip';
+                render();
+                window.showToast('Trip Started', 'യാത്ര തുടങ്ങി');
+
+            } catch (error) {
+                console.error("Zero-Error Logic Failure:", error);
+                if (error.en) {
+                    window.showToast(error.en, error.ml, true);
+                } else {
+                    window.showToast('Error starting trip. Please try again.', 'ട്രിപ്പ് തുടങ്ങുന്നതിൽ പിശക് സംഭവിച്ചു', true);
                 }
-            };
-
-            syncBurst();
+            } finally {
+                if (startBtn) {
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = `Confirm & Start Trip`;
+                }
+            }
         };
 
         window.openStopModal = (vid) => {
@@ -1935,91 +1995,76 @@
 
         window.confirmStopDriving = async () => {
             const v = state.selectedVehicle;
-            const km = document.getElementById('ending-km-input').value.trim();
+            const kmInput = document.getElementById('ending-km-input').value.trim();
             const notes = document.getElementById('trip-notes-input').value.trim();
+            const stopBtn = document.getElementById('stop-btn');
+            
             if (!v) return;
-            if (!km || isNaN(Number(km))) { window.showToast('Please enter a valid Ending KM', true); return; }
-            const endKmNum = Number(km);
+            if (!kmInput || isNaN(Number(kmInput))) { 
+                window.showToast('Please enter Ending KM', 'ദയവായി അവസാന കിലോമീറ്റർ രേഖപ്പെടുത്തുക', true); 
+                return; 
+            }
+            const endKmNum = Number(kmInput);
 
-            // 1. Find the active log/Id - Use the direct ID stored on the vehicle
+            // Fetch active log
             const activeLogId = v.activeLogId;
             const activeLogEntry = state.logs.find(log => log.id === activeLogId);
             const startingKm = activeLogEntry ? activeLogEntry.startingKm : (v.lastEndKm || 0);
 
             if (endKmNum < startingKm) {
-                window.showToast(`Error: Odometer cannot be less than start (${startingKm})`, true);
+                window.showToast(`Error: Odometer cannot be less than start (${startingKm})`, `അവസാന കിലോമീറ്റർ തുടങ്ങുന്നതിനേക്കാൾ (${startingKm}) കുറയാൻ പാടില്ല`, true);
                 return;
             }
 
-            // --- ZERO LATENCY UI: Reset views IMMEDIATELY ---
-            const vIdx = state.vehicles.findIndex(veh => veh.id === v.id);
-            if (vIdx > -1) {
-                state.vehicles[vIdx].status = 'Available';
-                state.vehicles[vIdx].currentDriverId = null;
-                state.vehicles[vIdx].activeLogId = null;
-                state.vehicles[vIdx].lastEndKm = endKmNum;
+            // LOADING STATE
+            if (stopBtn) {
+                stopBtn.disabled = true;
+                stopBtn.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Securing Vehicle...`;
             }
 
-            // Update local log status
-            const logIdx = state.logs.findIndex(l => l.id === activeLogId);
-            if (logIdx > -1) {
-                state.logs[logIdx].status = 'Closed';
-                state.logs[logIdx].endingKm = endKmNum;
-                state.logs[logIdx].endTime = new Date().toISOString();
-            }
+            try {
+                const now = new Date().toISOString();
+                
+                await runTransaction(db, async (transaction) => {
+                    const vRef = getDocRef('vehicles', v.id);
+                    const vSnap = await transaction.get(vRef);
+                    
+                    if (activeLogId) {
+                        const logRef = getDocRef('logs', activeLogId);
+                        transaction.update(logRef, {
+                            status: 'Closed',
+                            endTime: now,
+                            endingKm: endKmNum,
+                            notes: notes || null
+                        });
+                    }
 
-            state.view = 'vehicles';
-            state.selectedVehicle = null;
-            saveAppState();
-            render(); // Happens instantly
-
-            window.closeModal('stop-modal', 'stop-modal-content');
-            setTimeout(() => {
-                document.getElementById('stop-form').classList.remove('hidden');
-                document.getElementById('ending-km-input').value = '';
-                document.getElementById('trip-notes-input').value = '';
-            }, 300);
-
-            // --- BACKGROUND SYNC: Perform Firestore updates (Burst Mode) ---
-            state.isSyncing = true;
-            state.pendingWrites++;
-            render();
-
-            const syncBurstClose = async () => {
-                const promises = [];
-                try {
-                    // Vehicle Update
-                    promises.push(updateDoc(getDocRef('vehicles', v.id), {
+                    transaction.update(vRef, {
                         status: 'Available',
                         currentDriverId: null,
                         activeLogId: null,
-                        lastEndKm: endKmNum
-                    }));
+                        lastEndKm: endKmNum,
+                        lastEndTime: now
+                    });
+                });
 
-                    // Log Update
-                    if (activeLogId) {
-                        promises.push(updateDoc(getDocRef('logs', activeLogId), {
-                            status: 'Closed',
-                            endTime: new Date().toISOString(),
-                            endingKm: endKmNum,
-                            notes: notes || (activeLogEntry ? activeLogEntry.notes : null)
-                        }));
-                    }
+                // SUCCESS TRANSITION
+                state.view = 'vehicles';
+                state.selectedVehicle = null;
+                saveAppState();
+                render();
+                window.closeModal('stop-modal', 'stop-modal-content');
+                window.showToast('Vehicle Secured', 'വാഹനം പാർക്ക് ചെയ്തു');
 
-                    await Promise.all(promises);
-                } catch (e) {
-                    console.warn("Background Close Sync Warning:", e);
-                } finally {
-                    state.pendingWrites--;
-                    if (state.pendingWrites <= 0) {
-                        state.pendingWrites = 0;
-                        state.isSyncing = false;
-                    }
-                    render();
+            } catch (error) {
+                console.error("Critical Sync Error (Stop):", error);
+                window.showToast("Connection error. Try again.", "ബന്ധപ്പെടാൻ സാധിക്കുന്നില്ല. ദയവായി വീണ്ടും ശ്രമിക്കുക.", true);
+            } finally {
+                if (stopBtn) {
+                    stopBtn.disabled = false;
+                    stopBtn.innerHTML = `<i class="fas fa-map-marker-alt"></i> Park Vehicle`;
                 }
-            };
-
-            syncBurstClose();
+            }
         };
 
         window.logout = () => {
@@ -2146,6 +2191,13 @@
             document.getElementById('new-vehicle-mulkiya').value = '';
             document.getElementById('new-vehicle-insurance').value = '';
             document.getElementById('new-vehicle-oil').value = '';
+            
+            // Populate Primary Driver options
+            const driverSelect = document.getElementById('new-vehicle-primary-driver');
+            driverSelect.innerHTML = '<option value="">No Assigned Primary Driver</option>' + 
+                state.drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+            driverSelect.value = '';
+
             window.openModal('add-vehicle-modal', 'add-vehicle-content');
         };
 
@@ -2160,6 +2212,13 @@
             document.getElementById('new-vehicle-mulkiya').value = v.mulkiyaExpiry || '';
             document.getElementById('new-vehicle-insurance').value = v.insuranceExpiry || '';
             document.getElementById('new-vehicle-oil').value = v.nextOilChangeKm || '';
+            
+            // Populate Primary Driver options
+            const driverSelect = document.getElementById('new-vehicle-primary-driver');
+            driverSelect.innerHTML = '<option value="">No Assigned Primary Driver</option>' + 
+                state.drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+            driverSelect.value = v.primaryDriverId || '';
+
             window.openModal('add-vehicle-modal', 'add-vehicle-content');
         };
 
@@ -2170,8 +2229,9 @@
             const mulkiya = document.getElementById('new-vehicle-mulkiya').value;
             const insurance = document.getElementById('new-vehicle-insurance').value;
             const oil = document.getElementById('new-vehicle-oil').value;
+            const primaryDriverId = document.getElementById('new-vehicle-primary-driver').value;
 
-            if (!make || !plate) { window.showToast('Make/Model and Plate are required', true); return; }
+            if (!make || !plate) { window.showToast('Make/Model and Plate are required', 'മേക്കും മോഡലും പ്ലേറ്റ് നമ്പറും നിർബന്ധമാണ്', true); return; }
 
             const vehicleData = {
                 makeModel: make,
@@ -2179,25 +2239,26 @@
                 photo: photo,
                 mulkiyaExpiry: mulkiya || null,
                 insuranceExpiry: insurance || null,
-                nextOilChangeKm: oil ? Number(oil) : null
+                nextOilChangeKm: oil ? Number(oil) : null,
+                primaryDriverId: primaryDriverId || null
             };
 
             try {
                 if (state.editingVehicleId) {
                     await updateDoc(getDocRef('vehicles', state.editingVehicleId), vehicleData);
-                    window.showToast('Vehicle updated successfully');
+                    window.showToast('Vehicle updated successfully', 'വാഹന വിവരങ്ങൾ പുതുക്കി');
                 } else {
                     await addDoc(getCol('vehicles'), {
                         ...vehicleData,
                         status: 'Available',
                         currentDriverId: null
                     });
-                    window.showToast('Vehicle added successfully');
+                    window.showToast('Vehicle added successfully', 'പുതിയ വാഹനത്തെ ചേർത്തു');
                 }
                 window.closeModal('add-vehicle-modal', 'add-vehicle-content');
             } catch (e) {
                 console.error(e);
-                window.showToast('Error saving vehicle', true);
+                window.showToast('Error saving vehicle', 'വാഹന വിവരങ്ങൾ സംരക്ഷിക്കുന്നതിൽ പിശക്', true);
             }
         };
 
@@ -2248,17 +2309,17 @@
                     const updates = { name: name, photo: photo };
                     if (pin.length === 4) updates.pin = pin;
                     await updateDoc(getDocRef('drivers', state.editingDriverId), updates);
-                    window.showToast('Driver updated successfully');
+                    window.showToast('Driver updated successfully', 'ഡ്രൈവർ വിവരങ്ങൾ പുതുക്കി');
                 } else {
                     await addDoc(getCol('drivers'), {
                         name: name, pin: pin, photo: photo
                     });
-                    window.showToast('Driver added successfully');
+                    window.showToast('Driver added successfully', 'പുതിയ ഡ്രൈവറെ ചേർത്തു');
                 }
                 window.closeModal('add-driver-modal', 'add-driver-content');
             } catch (e) {
                 console.error(e);
-                window.showToast('Error saving driver', true);
+                window.showToast('Error saving driver', 'ഡ്രൈവർ വിവരങ്ങൾ സംരക്ഷിക്കുന്നതിൽ പിശക്', true);
             }
         };
 
@@ -2305,11 +2366,11 @@
             document.body.removeChild(a);
         };
 
-        window.runDataCleanup = async () => {
-            if (state.adminRole !== 'super') { window.showToast('Super Admin access required', true); return; }
-            if (!confirm('This will scan all logs and automatically trim overlaps (both odometer and driver time). Continue?')) return;
+        window.runDataCleanup = async (isSilent = false) => {
+            if (state.adminRole !== 'super') return;
+            if (!isSilent && !confirm('This will scan all logs and automatically trim overlaps (both odometer and driver time). Continue?')) return;
 
-            window.showToast('Scanning database...');
+            if (!isSilent) window.showToast('Scanning database...');
             try {
                 const logsSnap = await getDocs(getCol('logs'));
                 const allLogs = logsSnap.docs.map(d => ({ id: d.id, ...d.data(), ref: d.ref }));
@@ -2333,7 +2394,11 @@
                         if (currEnd > nextStart) {
                             updates.push({
                                 ref: current.ref,
-                                data: { status: 'Auto-Closed', endTime: next.startTime, notes: (current.notes ? current.notes + " | " : "") + "System Repair: Driver Switch" }
+                                data: { 
+                                    status: 'Auto-Closed', 
+                                    endTime: next.startTime, 
+                                    notes: (current.notes ? current.notes + " | " : "") + "System Repair: Driver Switch Correlation" 
+                                }
                             });
                         }
                     }
@@ -2354,10 +2419,17 @@
                         const currentEnd = current.endingKm;
                         const nextStart = next.startingKm || 0;
 
+                        // If an old trip is still "Active" but there's a newer trip, close it.
+                        // Or if the odometer reading overlaps with the next trip's start.
                         if (current.status === 'Active' || (currentEnd != null && currentEnd > nextStart)) {
                             updates.push({
                                 ref: current.ref,
-                                data: { status: 'Auto-Closed', endTime: next.startTime, endingKm: nextStart, notes: (current.notes ? current.notes + " | " : "") + "System Repair: Odometer Overlap" }
+                                data: { 
+                                    status: 'Auto-Closed', 
+                                    endTime: next.startTime, 
+                                    endingKm: nextStart, 
+                                    notes: (current.notes ? current.notes + " | " : "") + "System Repair: Odometer/Timeline Correction" 
+                                }
                             });
                         }
                     }
@@ -2375,11 +2447,13 @@
                     repairCount++;
                 }
 
-                window.showToast(`Cleanup Complete. ${repairCount} logs repaired.`);
-                render();
+                if (!isSilent && repairCount > 0) window.showToast(`Cleanup Complete. ${repairCount} logs repaired.`, `ശുചീകരണം പൂർത്തിയായി. ${repairCount} റെക്കോർഡുകൾ ശരിയാക്കി.`);
+                else if (!isSilent) window.showToast('No integrity issues found.', 'തകരാറുകൾ ഒന്നും കണ്ടെത്തിയില്ല.');
+                
+                if (repairCount > 0) render();
             } catch (e) {
                 console.error(e);
-                window.showToast('Cleanup Error', true);
+                if (!isSilent) window.showToast('Cleanup Error', 'ശുചീകരണത്തിൽ പിശക് സംഭവിച്ചു', true);
             }
         };
 
