@@ -1015,14 +1015,7 @@
             } catch (e) { console.error(e); window.showToast('Error updating log', true); }
         };
 
-        window.deleteLog = async (id) => {
-            if (state.adminRole !== 'super') return;
-            if (!confirm('Permanently delete this trip log? Data cannot be recovered.')) return;
-            try {
-                await deleteDoc(getDocRef('logs', id));
-                window.showToast('Log entry deleted');
-            } catch (e) { console.error(e); window.showToast('Error deleting log', true); }
-        };
+
 
         function checkLoaded(type) {
             loaded[type] = true;
@@ -1438,7 +1431,10 @@
                                 ${actionHtml}
                                 ${isSuper ? `
                                     <button onclick="window.openEditLogModal('${log.id}')" class="text-slate-300 hover:text-blue-600 transition-colors p-1.5 bg-slate-50 rounded-lg shadow-sm" title="Edit Log Entry"><i class="fas fa-edit text-xs"></i></button>
-                                    <button onclick="window.deleteLog('${log.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1.5 bg-slate-50 rounded-lg shadow-sm" title="Delete Log Entry"><i class="fas fa-trash text-xs"></i></button>
+                                    ${log.status === 'Active' ? 
+                                        `<button class="text-slate-200 cursor-not-allowed p-1.5 bg-slate-50 rounded-lg shadow-sm" title="Active trip cannot be deleted (Close it first)"><i class="fas fa-lock text-xs"></i></button>` :
+                                        `<button onclick="window.deleteLog('${log.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1.5 bg-slate-50 rounded-lg shadow-sm" title="Delete Log Entry"><i class="fas fa-trash text-xs"></i></button>`
+                                    }
                                 ` : ''}
                             </div>
                         </td>
@@ -1932,41 +1928,53 @@
                 startBtn.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Starting...`;
             }
 
-            try {
-                await runTransaction(db, async (transaction) => {
-                    const vRef = getDocRef('vehicles', v.id);
-                    const vSnap = await transaction.get(vRef);
-                    const vData = vSnap.data();
-
-                    const dRef = getDocRef('drivers', state.currentUser.id);
-                    const dSnap = await transaction.get(dRef);
-                    const dData = dSnap.data();
-
-                    // 1. Double-Booking Logic (Vehicle)
-                    if (vData.status === 'In Use' && vData.currentDriverId !== state.currentUser.id) {
-                        throw { 
-                            en: "Vehicle is currently in use by someone else", 
-                            ml: "ഈ വാഹനം നിലവിൽ മറ്റൊരാൾ ഉപയോഗിച്ചുകൊണ്ടിരിക്കുകയാണ്" 
-                        };
-                    }
-
-                    // 2. Double-Booking Logic (Driver)
-                    // (We check if driver has an existing active trip)
+            // 1. Pre-Transaction Check: Avoid queries inside transactions
+            if (state.currentUser) {
+                try {
                     const activeTripsQuery = query(getCol('logs'), where('driverId', '==', state.currentUser.id), where('status', '==', 'Active'), limit(1));
                     const activeTripsSnap = await getDocs(activeTripsQuery);
                     if (!activeTripsSnap.empty) {
                         const activeLog = activeTripsSnap.docs[0].data();
                         if (activeLog.vehicleId !== v.id) {
-                            throw { 
-                                en: "You already have an active trip on another vehicle", 
-                                ml: "നിങ്ങൾക്ക് നിലവിൽ മറ്റൊരു വാഹനത്തിൽ ട്രിപ്പ് സജീവമാണ്" 
-                            };
+                            window.showToast("You already have an active trip on another vehicle", "നിങ്ങൾക്ക് നിലവിൽ മറ്റൊരു വാഹനത്തിൽ ട്രിപ്പ് സജീവമാണ്", true);
+                            if (startBtn) { startBtn.disabled = false; startBtn.innerHTML = `Confirm & Start Trip`; }
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Validation Error:", e);
+                }
+            }
+
+            try {
+                const now = new Date().toISOString();
+                
+                await runTransaction(db, async (transaction) => {
+                    const vRef = getDocRef('vehicles', v.id);
+                    const vSnap = await transaction.get(vRef);
+                    const vData = vSnap.data();
+
+                    // 2. Vehicle Logic & Handover Automation
+                    if (vData.status === 'In Use' && vData.currentDriverId !== state.currentUser.id) {
+                        // AUTOMATIC HANDOVER: If vehicle is in use, close the previous driver's trip
+                        if (vData.activeLogId) {
+                            const prevLogRef = getDocRef('logs', vData.activeLogId);
+                            const prevLogSnap = await transaction.get(prevLogRef);
+                            
+                            // Only update if the log actually exists (handles manual deletions)
+                            if (prevLogSnap.exists()) {
+                                transaction.update(prevLogRef, {
+                                    status: 'Auto-Closed',
+                                    endTime: now,
+                                    endingKm: enterKmNum,
+                                    notes: `Auto-Closed during Handover to ${state.currentUser.name}`
+                                });
+                            }
                         }
                     }
 
                     const lastEndKm = vData.lastEndKm || 0;
-                    const lastEndTime = vData.lastEndTime || new Date().toISOString();
-                    const now = new Date().toISOString();
+                    const lastEndTime = vData.lastEndTime || (vData.lastEndTime ? vData.lastEndTime : now);
 
                     // 3. Gap Reconciliation Logic: Attribution to Primary Driver
                     if (enterKmNum > lastEndKm) {
@@ -2139,11 +2147,18 @@
         };
 
         window.forceCloseTrip = async (logId) => {
+            const log = state.logs.find(l => l.id === logId);
             const km = prompt('Enter the current odometer reading (KM) to force-close this trip:');
             if (km === null) return; // user cancelled
             if (!km.trim() || isNaN(Number(km))) { window.showToast('Invalid KM value', true); return; }
+            
+            const kmNum = Number(km);
+            if (log && kmNum < (log.startingKm || 0)) {
+                window.showToast(`Error: Odometer cannot be less than start (${log.startingKm || 0})`, `പിശക്: കിലോമീറ്റർ തുടങ്ങുന്നതിനേക്കാൾ (${log.startingKm || 0}) കുറയാൻ പാടില്ല`, true);
+                return;
+            }
+
             try {
-                const log = state.logs.find(l => l.id === logId);
                 await updateDoc(getDocRef('logs', logId), {
                     status: 'Force-Closed',
                     endTime: new Date().toISOString(),
@@ -2216,6 +2231,12 @@
         window.deleteLog = async (logId) => {
             if (state.adminRole !== 'super') {
                 window.showToast('Only Super Admin can delete records', true);
+                return;
+            }
+
+            const log = state.logs.find(l => l.id === logId);
+            if (log && log.status === 'Active') {
+                window.showToast('Cannot delete an active trip. Please close it first.', 'സജീവമായ യാത്ര ഒഴിവാക്കാൻ കഴിയില്ല. ദയവായി അത് അവസാനിപ്പിക്കുക.', true);
                 return;
             }
 
