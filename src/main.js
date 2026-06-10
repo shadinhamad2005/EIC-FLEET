@@ -1,7 +1,7 @@
-import { app, auth, db, getCol, getDocRef, signInAnonymously, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, setDoc } from './firebase/config.js?v=21';
-import { state, updateState, loadedFlags, subscribe } from './state.js?v=21';
-import { renderApp } from './ui/views.js?v=21';
-import { t, setLang } from './i18n.js?v=21';
+import { app, auth, db, getCol, getDocRef, signInAnonymously, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, setDoc } from './firebase/config.js?v=22';
+import { state, updateState, loadedFlags, subscribe } from './state.js?v=22';
+import { renderApp } from './ui/views.js?v=22';
+import { t, setLang } from './i18n.js?v=22';
 
 // Subscribe to state changes to trigger UI re-renders
 subscribe(renderApp);

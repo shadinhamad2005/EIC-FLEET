@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fleet-tracker-v6';
+const CACHE_NAME = 'fleet-tracker-v7';
 
 // ONLY cache truly static external assets (fonts, icons) — NEVER JS or CSS
 const STATIC_ASSETS = [
@@ -31,10 +31,21 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Always fetch local app files fresh from network
+  // Local app files: Network-First with Cache fallback, but also save to cache
   if (url.origin === self.location.origin) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
+      fetch(event.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+        return res;
+      }).catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        // If navigating to a page and offline, return the root index.html
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+      })
     );
     return;
   }

@@ -2,7 +2,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { 
     initializeFirestore, 
-    memoryLocalCache, 
+    persistentLocalCache,
+    persistentMultipleTabManager,
     collection, 
     doc,
     updateDoc,
@@ -31,7 +32,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = initializeFirestore(app, { localCache: memoryLocalCache() });
+const db = initializeFirestore(app, { 
+    localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()}) 
+});
 
 const APP_ID = "eic-fleet";
 const getCol = (name) => collection(db, 'artifacts', APP_ID, 'public', 'data', name);
