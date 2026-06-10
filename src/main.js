@@ -1,7 +1,7 @@
-import { app, auth, db, getCol, getDocRef, signInAnonymously, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, setDoc } from './firebase/config.js?v=23';
-import { state, updateState, loadedFlags, subscribe } from './state.js?v=23';
-import { renderApp } from './ui/views.js?v=23';
-import { t, setLang } from './i18n.js?v=23';
+import { app, auth, db, getCol, getDocRef, signInAnonymously, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, setDoc } from './firebase/config.js?v=25';
+import { state, updateState, loadedFlags, subscribe } from './state.js?v=25';
+import { renderApp } from './ui/views.js?v=25';
+import { t, setLang } from './i18n.js?v=25';
 
 // Subscribe to state changes to trigger UI re-renders
 subscribe(renderApp);
@@ -97,15 +97,27 @@ async function init() {
     if (debug) debug.innerHTML = 'Starting init()...<br>';
     
     try {
-        if (debug) debug.innerHTML += 'Calling signInAnonymously...<br>';
-        await signInAnonymously(auth);
-        
-        if (debug) debug.innerHTML += 'SignIn successful. Setting up listeners...<br>';
-        setupRealtimeListeners();
+        // Wait for first auth state to avoid hitting network if user is cached
+        const user = await new Promise((resolve) => {
+            const unsubscribe = auth.onAuthStateChanged((u) => {
+                unsubscribe();
+                resolve(u);
+            });
+        });
+
+        if (user) {
+            if (debug) debug.innerHTML += 'Cached user found. Setting up listeners...<br>';
+            setupRealtimeListeners();
+        } else {
+            if (debug) debug.innerHTML += 'No cached user. Calling signInAnonymously...<br>';
+            await signInAnonymously(auth);
+            if (debug) debug.innerHTML += 'SignIn successful. Setting up listeners...<br>';
+            setupRealtimeListeners();
+        }
     } catch (e) {
         if (debug) debug.innerHTML += `<br><span style="color:red">Init Error: ${e.message}</span>`;
         console.error("Firebase Init Error:", e);
-        showToast("Connection failed. Retrying...", "error");
+        showToast("Connection required for first-time setup.", "error");
         setTimeout(init, 5000);
     }
 }
@@ -402,7 +414,10 @@ window.confirmStartDriving = async function() {
 
     closeModal('start-modal');
     
-    // Get Geolocation if enabled
+    // Start animation immediately so the UI is responsive
+    const animPromise = showAnimation('start');
+    
+    // Get Geolocation if enabled (takes up to 5s if offline)
     let locationCoords = null;
     if (state.settings?.enableGeotagging) {
         locationCoords = await new Promise((resolve) => {
@@ -414,9 +429,6 @@ window.confirmStartDriving = async function() {
             );
         });
     }
-    
-    // Start animation and firebase in parallel
-    const animPromise = showAnimation('start');
     
     const firebasePromise = (async () => {
         // Auto-Close logic for forgotten trips
@@ -469,11 +481,10 @@ window.confirmStartDriving = async function() {
             status: 'Open'
         });
         await updateDoc(getDocRef('vehicles', vehicle.id), { status: 'In Use' });
-    })();
+    })().catch(e => console.error('Firebase background sync error:', e));
 
     try {
         const anim = await animPromise;
-        firebasePromise.catch(e => console.error('Firebase sync background error:', e));
         
         updateState({ view: 'active_trip' });
         anim.hide('Trip Started Successfully!');
@@ -510,6 +521,8 @@ window.confirmStopDriving = async function() {
 
     closeModal('stop-modal');
     
+    const animPromise = showAnimation('stop');
+    
     let locationCoords = null;
     if (state.settings?.enableGeotagging) {
         locationCoords = await new Promise((resolve) => {
@@ -522,8 +535,6 @@ window.confirmStopDriving = async function() {
         });
     }
     
-    const animPromise = showAnimation('stop');
-    
     const firebasePromise = (async () => {
         await updateDoc(getDocRef('logs', activeLog.id), {
             endingKm: endingKm,
@@ -533,11 +544,10 @@ window.confirmStopDriving = async function() {
             status: 'Closed'
         });
         await updateDoc(getDocRef('vehicles', vehicle.id), { status: 'Available' });
-    })();
+    })().catch(e => console.error('Firebase background sync error:', e));
 
     try {
         const anim = await animPromise;
-        firebasePromise.catch(e => console.error('Firebase sync background error:', e));
         
         updateState({ view: 'vehicles', selectedVehicle: null });
         anim.hide('Vehicle Parked Safely!');
@@ -566,20 +576,16 @@ window.confirmRefuel = async function() {
 
     closeModal('refuel-modal');
     
-    try {
-        // Optimistic offline write
-        await addDoc(getCol('refuels'), {
-            vehicleId: vehicle.id,
-            driverId: driver.id,
-            odometer: currentKm,
-            timestamp: new Date().toISOString(),
-            isFullTank: true
-        });
-        showToast('Refuel logged successfully!', 'success');
-    } catch (error) {
-        console.error(error);
-        showToast('Failed to log refuel. Will retry automatically.', 'warning');
-    }
+    // Optimistic offline write
+    addDoc(getCol('refuels'), {
+        vehicleId: vehicle.id,
+        driverId: driver.id,
+        odometer: currentKm,
+        timestamp: new Date().toISOString(),
+        isFullTank: true
+    }).catch(e => console.error('Firebase sync background error:', e));
+    
+    showToast('Refuel logged successfully!', 'success');
 };
 
 window.switchAdminTab = function(tab) {
@@ -630,33 +636,23 @@ window.saveDriver = async function() {
     
     if (!name) return showToast('Name is required', 'error');
 
-    try {
-        if (id) {
-            await updateDoc(getDocRef('drivers', id), { name, pin });
-            showToast('Driver updated', 'success');
-        } else {
-            await addDoc(getCol('drivers'), { name, pin, role: 'driver' });
-            showToast('Driver added', 'success');
-        }
-        closeModal('driver-modal');
-    } catch(e) {
-        console.error(e);
-        showToast('Error saving driver', 'error');
+    if (id) {
+        updateDoc(getDocRef('drivers', id), { name, pin }).catch(e => console.error(e));
+        showToast('Driver updated', 'success');
+    } else {
+        addDoc(getCol('drivers'), { name, pin, role: 'driver' }).catch(e => console.error(e));
+        showToast('Driver added', 'success');
     }
+    closeModal('driver-modal');
 };
 
 window.deleteDriver = async function() {
     const id = document.getElementById('driver-id-input').value;
     if(!id) return;
     if(!confirm("Are you sure you want to permanently delete this driver?")) return;
-    try {
-        await deleteDoc(getDocRef('drivers', id));
-        showToast('Driver deleted', 'success');
-        closeModal('driver-modal');
-    } catch(e) {
-        console.error(e);
-        showToast('Error deleting driver', 'error');
-    }
+    deleteDoc(getDocRef('drivers', id)).catch(e => console.error(e));
+    showToast('Driver deleted', 'success');
+    closeModal('driver-modal');
 };
 
 window.openVehicleModal = function(id = null) {
@@ -704,20 +700,15 @@ window.saveVehicle = async function() {
         serviceIntervalKm
     };
 
-    try {
-        if (id) {
-            await updateDoc(getDocRef('vehicles', id), vehicleData);
-            showToast('Vehicle updated successfully');
-        } else {
-            vehicleData.status = 'Available';
-            await addDoc(getCol('vehicles'), vehicleData);
-            showToast('Vehicle added successfully');
-        }
-        closeModal('vehicle-modal');
-    } catch (e) {
-        console.error(e);
-        showToast('Error saving vehicle', 'error');
+    if (id) {
+        updateDoc(getDocRef('vehicles', id), vehicleData).catch(e => console.error(e));
+        showToast('Vehicle updated successfully');
+    } else {
+        vehicleData.status = 'Available';
+        addDoc(getCol('vehicles'), vehicleData).catch(e => console.error(e));
+        showToast('Vehicle added successfully');
     }
+    closeModal('vehicle-modal');
 };
 
 window.logVehicleService = async function(vehicleId) {
@@ -737,15 +728,10 @@ window.logVehicleService = async function(vehicleId) {
     }
 
     if (confirm(`Confirm maintenance completed for ${vehicle.makeModel} at ${currentKm} KM?`)) {
-        try {
-            await updateDoc(getDocRef('vehicles', vehicleId), {
-                lastServiceKm: currentKm
-            });
-            showToast('Maintenance logged successfully');
-        } catch (e) {
-            console.error(e);
-            showToast('Error logging maintenance', 'error');
-        }
+        updateDoc(getDocRef('vehicles', vehicleId), {
+            lastServiceKm: currentKm
+        }).catch(e => console.error(e));
+        showToast('Maintenance logged successfully');
     }
 };
 
@@ -753,14 +739,9 @@ window.deleteVehicle = async function() {
     const id = document.getElementById('vehicle-id-input').value;
     if(!id) return;
     if(!confirm("Are you sure you want to permanently delete this vehicle?")) return;
-    try {
-        await deleteDoc(getDocRef('vehicles', id));
-        showToast('Vehicle deleted', 'success');
-        closeModal('vehicle-modal');
-    } catch(e) {
-        console.error(e);
-        showToast('Error deleting vehicle', 'error');
-    }
+    deleteDoc(getDocRef('vehicles', id)).catch(e => console.error(e));
+    showToast('Vehicle deleted successfully');
+    closeModal('vehicle-modal');
 };
 
 window.adminForceCloseTrip = async function(logId, vehicleId) {
@@ -771,34 +752,24 @@ window.adminForceCloseTrip = async function(logId, vehicleId) {
     const endingKm = parseInt(endingKmStr);
     if (isNaN(endingKm)) return showToast('Please enter a valid ending KM', 'error');
     
-    try {
-        await updateDoc(getDocRef('logs', logId), {
-            endingKm: endingKm,
-            endTime: new Date().toISOString(),
-            notes: 'Force closed by Admin',
-            status: 'Closed'
-        });
-        await updateDoc(getDocRef('vehicles', vehicleId), { status: 'Available' });
-        showToast('Trip force closed successfully', 'success');
-    } catch (e) {
-        console.error(e);
-        showToast('Failed to force close trip', 'error');
-    }
+    updateDoc(getDocRef('logs', logId), {
+        endingKm: endingKm,
+        endTime: new Date().toISOString(),
+        notes: 'Force closed by Admin',
+        status: 'Closed'
+    }).catch(e => console.error(e));
+    updateDoc(getDocRef('vehicles', vehicleId), { status: 'Available' }).catch(e => console.error(e));
+    showToast('Trip force closed successfully', 'success');
 };
 
 window.sendBroadcast = async function() {
     const msg = prompt("Enter announcement message to broadcast to all drivers:");
     if (!msg || !msg.trim()) return;
-    try {
-        await addDoc(getCol('broadcasts'), {
-            message: msg.trim(),
-            timestamp: new Date().toISOString()
-        });
-        showToast('Announcement broadcasted!', 'success');
-    } catch(e) {
-        console.error(e);
-        showToast('Failed to send announcement', 'error');
-    }
+    addDoc(getCol('broadcasts'), {
+        message: msg.trim(),
+        timestamp: new Date().toISOString()
+    }).catch(e => console.error(e));
+    showToast('Announcement broadcasted!', 'success');
 };
 
 window.dismissBroadcast = function(id) {
@@ -921,14 +892,9 @@ window.saveTripEdit = async function() {
     if (driverId) updates.driverId = driverId;
     if (vehicleId) updates.vehicleId = vehicleId;
 
-    try {
-        await updateDoc(getDocRef('logs', id), updates);
-        showToast('Trip updated successfully');
-        closeModal('edit-trip-modal');
-    } catch (e) {
-        console.error(e);
-        showToast('Error updating trip', 'error');
-    }
+    updateDoc(getDocRef('logs', id), updates).catch(e => console.error(e));
+    showToast('Trip updated successfully');
+    closeModal('edit-trip-modal');
 };
 
 window.deleteTrip = async function(logId) {
@@ -938,13 +904,8 @@ window.deleteTrip = async function(logId) {
     
     if (!confirm('Are you sure you want to permanently delete this trip log?')) return;
     
-    try {
-        await deleteDoc(getDocRef('logs', logId));
-        showToast('Trip deleted successfully');
-    } catch (e) {
-        console.error(e);
-        showToast('Error deleting trip', 'error');
-    }
+    deleteDoc(getDocRef('logs', logId)).catch(e => console.error(e));
+    showToast('Trip deleted successfully');
 };
 
 let fleetMap = null;
