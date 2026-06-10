@@ -1,51 +1,60 @@
-const CACHE_NAME = 'fleet-tracker-v1';
-const ASSETS_TO_CACHE = [
-  './index.html',
-  './manifest.json',
+const CACHE_NAME = 'fleet-tracker-v6';
+
+// ONLY cache truly static external assets (fonts, icons) — NEVER JS or CSS
+const STATIC_ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-  'https://cdn-icons-png.flaticon.com/512/3202/3202926.png',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap'
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;800&display=swap'
 ];
 
-// Install Event
+// Install — pre-cache only static assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Service Worker: Caching Assets');
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
   self.skipWaiting();
 });
 
-// Activate Event
+// Activate — wipe all old caches immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('Service Worker: Clearing Old Cache');
-            return caches.delete(cache);
-          }
-        })
-      );
-    })
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
   );
+  self.clients.claim();
 });
 
-// Fetch Event (Network First, then Cache)
+// Fetch strategy:
+//   - Local JS/CSS files → ALWAYS fetch from network (never serve stale)
+//   - Firebase/Mapbox/external APIs → ALWAYS network only (no caching)
+//   - Static CDN assets (fonts, icons) → Cache first, network fallback
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Always fetch local app files fresh from network
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Never cache Firebase, Mapbox, or any API calls
+  const noCacheHosts = ['firestore.googleapis.com', 'firebase.googleapis.com', 'identitytoolkit.googleapis.com', 'api.mapbox.com', 'router.project-osrm.org', 'nominatim.openstreetmap.org'];
+  if (noCacheHosts.some(h => url.hostname.includes(h))) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // For static CDN assets: cache-first
   event.respondWith(
-    fetch(event.request)
-      .then((res) => {
-        // Reproduce the response and cache it
-        const resClone = res.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, resClone);
-        });
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+      return fetch(event.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
         return res;
-      })
-      .catch(() => caches.match(event.request).then((res) => res))
+      });
+    })
   );
 });
