@@ -1,5 +1,5 @@
-import { state } from '../state.js?v=20';
-import { t } from '../i18n.js?v=20';
+import { state } from '../state.js?v=21';
+import { t } from '../i18n.js?v=21';
 
 function getLangSwitcher() {
     const lang = localStorage.getItem('eic_lang') || 'en';
@@ -110,15 +110,17 @@ function renderVehicles() {
     const container = document.getElementById('view-vehicles');
     
     let html = `
-        <div class="header">
+        <div class="header" style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; padding-bottom: 1rem;">
             <div>
-                <h2 style="font-size: 1.5rem;">${t('available_vehicles')}</h2>
-                <p class="text-muted">${t('select_vehicle_start')}</p>
+                <h2 style="font-size: 1.5rem; margin: 0 0 0.2rem 0;">${t('available_vehicles')}</h2>
+                <p class="text-muted" style="margin: 0; font-size: 0.9rem;">${t('select_vehicle_start')}</p>
             </div>
-            <div class="user-info" style="display: flex; gap: 1rem; align-items: center;">
-                <span style="font-weight: 600;">${state.currentUser?.name}</span>
+            <div class="user-info" style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                <span style="font-weight: 600; font-size: 1rem;"><i class="fas fa-user-circle" style="color: var(--accent-primary); margin-right: 0.25rem;"></i>${state.currentUser?.name}</span>
                 ${getLangSwitcher()}
-                <button onclick="window.handleLogout()" class="btn btn-outline" style="padding: 0.5rem 1rem;">${t('logout')}</button>
+                <button onclick="window.handleLogout()" class="btn btn-outline" style="padding: 0.5rem; width: 38px; height: 38px; display: flex; justify-content: center; align-items: center; border-color: var(--accent-danger); color: var(--accent-danger);" title="${t('logout')}">
+                    <i class="fas fa-power-off"></i>
+                </button>
             </div>
         </div>
         <div class="card-grid">
@@ -404,13 +406,17 @@ function renderAdmin() {
     }
 
     container.innerHTML = `
-        <div class="header">
+        <div class="header" style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
             <div>
-                <h2 style="font-size: 1.5rem;">Admin Dashboard</h2>
+                <h2 style="font-size: 1.5rem; margin: 0 0 0.2rem 0;"><i class="fas fa-shield-alt text-primary"></i> Admin Dashboard</h2>
+                <p class="text-muted" style="margin: 0; font-size: 0.9rem;">Manage fleet, drivers, and view logs</p>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
+            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                <span class="badge badge-warning" style="text-transform: capitalize;">Role: ${state.adminRole}</span>
                 <button onclick="window.sendBroadcast()" class="btn btn-primary" style="padding: 0.5rem 1rem; width: auto;"><i class="fas fa-bullhorn"></i> Broadcast</button>
-                <button onclick="window.handleLogout()" class="btn btn-outline" style="padding: 0.5rem 1rem; width: auto;">Logout</button>
+                <button onclick="window.handleLogout()" class="btn btn-outline" style="padding: 0.5rem; width: 38px; height: 38px; display: flex; justify-content: center; align-items: center; border-color: var(--accent-danger); color: var(--accent-danger);" title="Logout">
+                    <i class="fas fa-power-off"></i>
+                </button>
             </div>
         </div>
         
