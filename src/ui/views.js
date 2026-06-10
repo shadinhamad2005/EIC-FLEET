@@ -1,5 +1,5 @@
-import { state } from '../state.js?v=22';
-import { t } from '../i18n.js?v=22';
+import { state } from '../state.js?v=23';
+import { t } from '../i18n.js?v=23';
 
 function getLangSwitcher() {
     const lang = localStorage.getItem('eic_lang') || 'en';

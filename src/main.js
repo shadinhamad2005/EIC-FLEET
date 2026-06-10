@@ -1,7 +1,7 @@
-import { app, auth, db, getCol, getDocRef, signInAnonymously, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, setDoc } from './firebase/config.js?v=22';
-import { state, updateState, loadedFlags, subscribe } from './state.js?v=22';
-import { renderApp } from './ui/views.js?v=22';
-import { t, setLang } from './i18n.js?v=22';
+import { app, auth, db, getCol, getDocRef, signInAnonymously, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, setDoc } from './firebase/config.js?v=23';
+import { state, updateState, loadedFlags, subscribe } from './state.js?v=23';
+import { renderApp } from './ui/views.js?v=23';
+import { t, setLang } from './i18n.js?v=23';
 
 // Subscribe to state changes to trigger UI re-renders
 subscribe(renderApp);
@@ -472,7 +472,9 @@ window.confirmStartDriving = async function() {
     })();
 
     try {
-        const [anim] = await Promise.all([animPromise, firebasePromise]);
+        const anim = await animPromise;
+        firebasePromise.catch(e => console.error('Firebase sync background error:', e));
+        
         updateState({ view: 'active_trip' });
         anim.hide('Trip Started Successfully!');
     } catch (error) {
@@ -534,7 +536,9 @@ window.confirmStopDriving = async function() {
     })();
 
     try {
-        const [anim] = await Promise.all([animPromise, firebasePromise]);
+        const anim = await animPromise;
+        firebasePromise.catch(e => console.error('Firebase sync background error:', e));
+        
         updateState({ view: 'vehicles', selectedVehicle: null });
         anim.hide('Vehicle Parked Safely!');
     } catch (error) {
