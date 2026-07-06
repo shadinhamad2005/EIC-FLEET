@@ -23,15 +23,11 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
     
-    <!-- html2pdf -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
     <!-- Core Design System and Styles -->
     <link rel="stylesheet" href="./src/styles/main.css">
     
-    <!-- jsPDF & AutoTable -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- jsPDF & AutoTable removed from head to prevent blocking offline load -->
+    
 </head>
 <body>
     <div id="app" class="app-container">
@@ -266,9 +262,25 @@
             </div>
         </div>
     </div>
+    <!-- Ready Modal -->
+    <div id="ready-modal" class="modal-overlay hidden">
+        <div class="modal-backdrop" onclick="window.closeModal('ready-modal')"></div>
+        <div class="modal-container" style="max-width: 400px; width: 90%;">
+            <div class="modal-content" style="text-align: center; padding: 2rem 1.5rem;">
+                <div style="font-size: 3rem; color: var(--accent-primary); margin-bottom: 1rem;">
+                    <i class="fas fa-question-circle"></i>
+                </div>
+                <h3 id="ready-modal-title" style="font-size: 1.5rem; margin-bottom: 1rem; color: var(--text-primary);">Are you ready for the trip?</h3>
+                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                    <button id="ready-modal-cancel" onclick="window.confirmReady(false)" class="btn btn-outline" style="flex: 1; padding: 1rem; font-size: 1.1rem; color: var(--text-secondary);">No, cancel</button>
+                    <button id="ready-modal-confirm" onclick="window.confirmReady(true)" class="btn btn-primary" style="flex: 1; padding: 1rem; font-size: 1.1rem;">Yes, I'm ready</button>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Map Modal -->
-    <div id="map-modal" class="modal hidden">
+    <div id="map-modal" class="modal-overlay hidden">
         <div class="modal-backdrop" onclick="window.closeModal('map-modal')"></div>
         <div class="modal-container" style="max-width: 800px; width: 95%;">
             <div class="modal-content">
@@ -325,6 +337,6 @@
     </script>
     
     <!-- Main Application Logic (Native ES Modules) -->
-    <script type="module" src="./src/main.js?v=25"></script>
+    <script type="module" src="./src/main.js?v=35"></script>
 </body>
 </html>
