@@ -1,7 +1,7 @@
-import { app, auth, db, getCol, getDocRef, signInAnonymously, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, setDoc } from './firebase/config.js?v=25';
-import { state, updateState, loadedFlags, subscribe } from './state.js?v=25';
-import { renderApp } from './ui/views.js?v=25';
-import { t, setLang } from './i18n.js?v=25';
+import { app, auth, db, getCol, getDocRef, signInAnonymously, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, setDoc } from './firebase/config.js?v=27';
+import { state, updateState, loadedFlags, subscribe } from './state.js?v=27';
+import { renderApp } from './ui/views.js?v=27';
+import { t, setLang } from './i18n.js?v=27';
 
 // Subscribe to state changes to trigger UI re-renders
 subscribe(renderApp);
@@ -337,6 +337,79 @@ function showAnimation(type) {
     });
 }
 
+window.openReadyModal = function(type, vehicleId = null) {
+    if (!state.settings?.enableGeotagging) {
+        if (type === 'start') return window.openStartModal(vehicleId);
+        if (type === 'stop') return window.openStopModal();
+    }
+    
+    // Store type and vehicle for confirm
+    window._readyType = type;
+    window._readyVehicle = vehicleId;
+    
+    const titleEl = document.getElementById('ready-modal-title');
+    const cancelBtn = document.getElementById('ready-modal-cancel');
+    const confirmBtn = document.getElementById('ready-modal-confirm');
+    
+    if (titleEl) {
+        titleEl.textContent = type === 'start' ? 'Are you ready to start the trip?' : 'Are you ready to end the trip?';
+    }
+    if (cancelBtn) {
+        cancelBtn.textContent = type === 'start' ? 'No, cancel' : 'Cancel';
+    }
+    if (confirmBtn) {
+        confirmBtn.textContent = type === 'start' ? 'Yes, I\'m ready' : 'End Trip';
+    }
+    
+    openModal('ready-modal');
+};
+
+window.confirmReady = async function(isReady) {
+    if (!isReady) {
+        closeModal('ready-modal');
+        window._tempLocationCoords = null; // No location grabbed
+    } else {
+        const confirmBtn = document.getElementById('ready-modal-confirm');
+        const cancelBtn = document.getElementById('ready-modal-cancel');
+        const originalText = confirmBtn.textContent;
+        
+        // Show loading state on the button
+        confirmBtn.disabled = true;
+        cancelBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Acquiring GPS...';
+        
+        // Try to get location. Will prompt if first time.
+        window._tempLocationCoords = await new Promise((resolve) => {
+            if (!navigator.geolocation) return resolve(null);
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (err) => {
+                    if (err.code === err.PERMISSION_DENIED) {
+                        showToast('Location denied. Please allow it in settings next time.', 'warning');
+                    }
+                    resolve(null);
+                },
+                { timeout: 30000, enableHighAccuracy: true } // 30 seconds to allow time to click the native prompt
+            );
+        });
+        
+        // Restore button state and close modal
+        confirmBtn.disabled = false;
+        cancelBtn.disabled = false;
+        confirmBtn.textContent = originalText;
+        closeModal('ready-modal');
+    }
+    
+    if (isReady) {
+        // Proceed to actual modal based on the stored type
+        if (window._readyType === 'start') {
+            window.openStartModal(window._readyVehicle);
+        } else {
+            window.openStopModal();
+        }
+    }
+};
+
 window.openStartModal = function(vid) {
     const vehicle = state.vehicles.find(v => v.id === vid);
     if (!vehicle) return;
@@ -417,18 +490,9 @@ window.confirmStartDriving = async function() {
     // Start animation immediately so the UI is responsive
     const animPromise = showAnimation('start');
     
-    // Get Geolocation if enabled (takes up to 5s if offline)
-    let locationCoords = null;
-    if (state.settings?.enableGeotagging) {
-        locationCoords = await new Promise((resolve) => {
-            if (!navigator.geolocation) return resolve(null);
-            navigator.geolocation.getCurrentPosition(
-                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => resolve(null),
-                { timeout: 5000 }
-            );
-        });
-    }
+    // Use the location we grabbed in the Ready Modal (if any)
+    let locationCoords = window._tempLocationCoords || null;
+    window._tempLocationCoords = null; // Clear it so it's not reused accidentally
     
     const firebasePromise = (async () => {
         // Auto-Close logic for forgotten trips
@@ -523,17 +587,9 @@ window.confirmStopDriving = async function() {
     
     const animPromise = showAnimation('stop');
     
-    let locationCoords = null;
-    if (state.settings?.enableGeotagging) {
-        locationCoords = await new Promise((resolve) => {
-            if (!navigator.geolocation) return resolve(null);
-            navigator.geolocation.getCurrentPosition(
-                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => resolve(null),
-                { timeout: 5000 }
-            );
-        });
-    }
+    // Use the location we grabbed in the Ready Modal (if any)
+    let locationCoords = window._tempLocationCoords || null;
+    window._tempLocationCoords = null;
     
     const firebasePromise = (async () => {
         await updateDoc(getDocRef('logs', activeLog.id), {
@@ -792,30 +848,94 @@ window.clearTripFilter = function() {
     renderApp();
 };
 
-window.exportTripLogsPDF = function() {
-    const element = document.getElementById('trips-table-container');
-    if (!element) return;
-    
-    // Temporarily show title for PDF and hide action columns
-    const title = document.getElementById('pdf-report-title');
-    if (title) title.style.display = 'block';
-    
-    const noPrintElements = element.querySelectorAll('.no-print');
-    noPrintElements.forEach(el => el.style.display = 'none');
+window.exportTripLogsPDF = async function() {
+    // Dynamically load scripts if not present to avoid offline blocking on startup
+    if (typeof window.jspdf === 'undefined') {
+        showToast('Loading PDF engine, please wait...', 'warning');
+        try {
+            await new Promise((resolve, reject) => {
+                const s1 = document.createElement('script');
+                s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                s1.onload = resolve;
+                s1.onerror = reject;
+                document.head.appendChild(s1);
+            });
+            await new Promise((resolve, reject) => {
+                const s2 = document.createElement('script');
+                s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js';
+                s2.onload = resolve;
+                s2.onerror = reject;
+                document.head.appendChild(s2);
+            });
+        } catch(e) {
+            return showToast('Failed to load PDF library. Check your internet connection.', 'error');
+        }
+    }
 
-    const opt = {
-        margin:       0.5,
-        filename:     `Fleet_Trip_Logs_${new Date().toISOString().split('T')[0]}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2 },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
-    };
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape');
 
-    html2pdf().set(opt).from(element).save().then(() => {
-        // Restore UI
-        if (title) title.style.display = 'none';
-        noPrintElements.forEach(el => el.style.display = '');
+    // 1. Filter logic based on Admin State
+    const filterStart = state.tripFilterStart ? new Date(state.tripFilterStart).getTime() : 0;
+    const filterEnd = state.tripFilterEnd ? new Date(state.tripFilterEnd).getTime() + 86400000 : Infinity; // Include whole day
+
+    let filteredLogs = [...state.logs];
+    if (filterStart || filterEnd !== Infinity) {
+        filteredLogs = filteredLogs.filter(l => {
+            const logTime = new Date(l.startTime).getTime();
+            return logTime >= filterStart && logTime <= filterEnd;
+        });
+    }
+    const sortedLogs = filteredLogs.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+
+    // 2. Map data for AutoTable
+    const tableData = sortedLogs.map(l => {
+        const v = state.vehicles.find(v => v.id === l.vehicleId);
+        const d = state.drivers.find(d => d.id === l.driverId);
+        
+        const startObj = new Date(l.startTime);
+        const startStr = startObj.toLocaleDateString() + ' ' + startObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        let endStr = 'In Progress';
+        if (l.endTime) {
+            const endObj = new Date(l.endTime);
+            endStr = endObj.toLocaleDateString() + ' ' + endObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+        
+        const vehicleStr = v ? `${v.makeModel} (${v.plate || 'N/A'})` : 'Unknown Vehicle';
+        const driverStr = d ? d.name : 'Unknown Driver';
+        const odoStr = `${l.startingKm} - ${l.endingKm || 'Active'}`;
+        const statusStr = (l.status === 'Open' || !l.endingKm) ? 'Active' : 'Closed';
+        const purposeStr = l.purpose || l.notes || '';
+
+        return [startStr, endStr, vehicleStr, driverStr, odoStr, statusStr, purposeStr];
     });
+
+    // 3. Build PDF
+    doc.setFontSize(18);
+    doc.text('Fleet Trip Logs Report', 14, 22);
+    
+    doc.setFontSize(11);
+    let subtitle = 'All Time';
+    if (state.tripFilterStart || state.tripFilterEnd) {
+        subtitle = `Date Range: ${state.tripFilterStart || 'Beginning'} to ${state.tripFilterEnd || 'Today'}`;
+    }
+    doc.text(subtitle, 14, 30);
+    
+    doc.autoTable({
+        startY: 36,
+        head: [['Start Time', 'End Time', 'Vehicle', 'Driver', 'Odometer', 'Status', 'Purpose/Notes']],
+        body: tableData,
+        theme: 'striped',
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [15, 23, 42] },
+        margin: { top: 36 }
+    });
+
+    // 4. Save
+    const filename = `Fleet_Trip_Logs_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+    showToast('PDF downloaded successfully!', 'success');
 };
 
 window.openEditTripModal = function(logId) {

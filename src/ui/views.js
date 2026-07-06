@@ -1,5 +1,5 @@
-import { state } from '../state.js?v=25';
-import { t } from '../i18n.js?v=25';
+import { state } from '../state.js?v=27';
+import { t } from '../i18n.js?v=27';
 
 function getLangSwitcher() {
     const lang = localStorage.getItem('eic_lang') || 'en';
@@ -135,7 +135,7 @@ function renderVehicles() {
             : `<span class="badge badge-success">${t('available')}</span>`;
 
         html += `
-            <div class="card" onclick="window.openStartModal('${v.id}')" ${isTaken ? 'style="border: 1px solid var(--accent-warning);"' : ''}>
+            <div class="card" onclick="window.openReadyModal('start', '${v.id}')" ${isTaken ? 'style="border: 1px solid var(--accent-warning);"' : ''}>
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
                     <div>
                         <h3 style="font-size: 1.25rem; margin-bottom: 0.25rem;">${v.makeModel}</h3>
@@ -177,7 +177,7 @@ function renderActiveTrip() {
                 <button onclick="window.openRefuelModal()" class="btn btn-outline" style="flex: 1; padding: 1rem; border-color: var(--accent-success); color: var(--accent-success);">
                     <i class="fas fa-gas-pump" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i> ${t('log_refuel')}
                 </button>
-                <button onclick="window.openStopModal()" class="btn btn-success" style="flex: 1; font-size: 1.25rem; padding: 1rem;">
+                <button onclick="window.openReadyModal('stop')" class="btn btn-success" style="flex: 1; font-size: 1.25rem; padding: 1rem;">
                     <i class="fas fa-stop-circle" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i> ${t('end_trip')}
                 </button>
             </div>
@@ -314,14 +314,23 @@ function renderAdmin() {
             } else {
                 maintBadge = `<span class="badge badge-success">Healthy (${remaining} KM left)</span>`;
             }
+            const activeLog = state.logs.find(l => l.vehicleId === v.id && l.endingKm == null);
+            const isTaken = !!activeLog;
+            const currentDriverName = isTaken ? (state.drivers.find(d => d.id === activeLog.driverId)?.name || 'Unknown') : null;
+            const defaultDriverName = v.assignedDriverId ? (state.drivers.find(d => d.id === v.assignedDriverId)?.name || 'Unknown') : 'None';
             
             return `
             <tr>
-                <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light);"><strong>${v.makeModel}</strong><br><span style="font-size: 0.75rem; color: var(--text-muted);"><i class="fas fa-user" style="margin-right:0.25rem;"></i>${v.assignedDriverId ? (state.drivers.find(d => d.id === v.assignedDriverId)?.name || 'Unknown Driver') : 'Unassigned'}</span></td>
+                <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light);">
+                    <strong>${v.makeModel}</strong><br>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);"><i class="fas fa-user-tag" style="margin-right:0.25rem;"></i>Default: ${defaultDriverName}</span>
+                </td>
                 <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light);">${v.plate || 'Unknown'}</td>
                 <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light);">${distanceSinceFull}</td>
                 <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light);">${maintBadge}</td>
-                <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light);">${v.status === 'Available' ? '<span class="badge badge-success">Available</span>' : '<span class="badge badge-warning">In Use</span>'}</td>
+                <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light);">
+                    ${isTaken ? `<span class="badge badge-warning">In Use by ${currentDriverName}</span>` : '<span class="badge badge-success">Available</span>'}
+                </td>
                 <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light); width: 1%; white-space: nowrap;">
                     <button class="btn btn-outline" style="padding: 0; width: 32px; height: 32px; font-size: 0.8rem; color: var(--accent-success); border-color: var(--accent-success); margin-right: 0.5rem; display: inline-flex; justify-content: center; align-items: center;" onclick="window.logVehicleService('${v.id}')" title="Log Service"><i class="fas fa-wrench"></i></button>
                     <button class="btn btn-outline" style="padding: 0; width: 32px; height: 32px; font-size: 0.8rem; display: inline-flex; justify-content: center; align-items: center;" onclick="window.openVehicleModal('${v.id}')" title="Edit Vehicle"><i class="fas fa-edit"></i></button>
