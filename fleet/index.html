@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3202/3202926.png">
+    
+    <title>EIC Fleet Tracker | Advanced Logistics</title>
+    
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Mapbox GL JS for interactive maps -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+    
+    <!-- Core Design System and Styles -->
+    <link rel="stylesheet" href="./src/styles/main.css">
+    
+    <!-- jsPDF & AutoTable removed from head to prevent blocking offline load -->
+    
+</head>
+<body>
+    <div id="app" class="app-container">
+        <div id="broadcast-container" style="max-width: 600px; width: 100%; margin: 0 auto; padding: 1rem 1rem 0 1rem; box-sizing: border-box;"></div>
+        <div id="view-loader" class="view view-loader">
+            <div class="loader-content">
+                <i class="fas fa-truck-loading loader-icon"></i>
+                <h2>Loading Fleet System...</h2>
+            </div>
+        </div>
+        
+        <div id="view-login" class="view hidden"></div>
+        <div id="view-vehicles" class="view hidden"></div>
+        <div id="view-active-trip" class="view hidden"></div>
+        <div id="view-admin" class="view hidden"></div>
+    </div>
+
+    <!-- Modals Container -->
+    <div id="modals-container">
+        <!-- Start Trip Modal -->
+        <div id="start-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" data-i18n="start_trip_title">Start Trip</h3>
+                    <button onclick="window.closeModal('start-modal')" class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted" style="margin-bottom: 1.5rem;" data-i18n="select_vehicle_start">Enter trip details and confirm starting odometer.</p>
+                    
+                    <div class="input-group">
+                        <label class="input-label" data-i18n="starting_km">Starting KM (Odometer)</label>
+                        <input type="number" id="start-km-input" class="input-field" placeholder="e.g., 45120">
+                        <p id="last-km-hint" class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;"></p>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label" data-i18n="purpose_of_trip">Trip Purpose</label>
+                        <input type="text" id="purpose-input" class="input-field" placeholder="e.g., Delivery Route">
+                    </div>
+
+                    <button onclick="window.confirmStartDriving()" class="btn btn-primary" style="margin-top: 1rem;">
+                        <i class="fas fa-play"></i> <span data-i18n="start_driving">Start Driving</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stop Trip Modal -->
+        <div id="stop-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" data-i18n="stop_trip_title">Stop Trip</h3>
+                    <button onclick="window.closeModal('stop-modal')" class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted" style="margin-bottom: 1.5rem;" data-i18n="confirm_park">Enter final odometer reading to park securely.</p>
+                    
+                    <div class="input-group">
+                        <label class="input-label" data-i18n="ending_km">Ending KM (Odometer)</label>
+                        <input type="number" id="ending-km-input" class="input-field" placeholder="e.g., 45150">
+                    </div>
+                    
+
+                    <div class="input-group">
+                        <label class="input-label" data-i18n="trip_notes">Trip Notes (Optional)</label>
+                        <textarea id="trip-notes-input" class="input-field" rows="2" placeholder="e.g., Low tire pressure..."></textarea>
+                    </div>
+
+                    <button onclick="window.confirmStopDriving()" class="btn btn-success" style="margin-top: 1rem;">
+                        <i class="fas fa-stop"></i> <span data-i18n="confirm_park">Park Vehicle</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Driver Modal -->
+        <div id="driver-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="driver-modal-title">Manage Driver</h3>
+                    <button onclick="window.closeModal('driver-modal')" class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="driver-id-input">
+                    <div class="input-group">
+                        <label class="input-label">Driver Name</label>
+                        <input type="text" id="driver-name-input" class="input-field" placeholder="e.g., Shanid">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">PIN</label>
+                        <input type="text" id="driver-pin-input" class="input-field" placeholder="e.g., 1234">
+                    </div>
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                        <button onclick="window.saveDriver()" class="btn btn-primary" style="flex: 1;"><i class="fas fa-save"></i> Save</button>
+                        <button onclick="window.deleteDriver()" id="btn-delete-driver" class="btn btn-outline" style="flex: 1; color: var(--accent-danger); border-color: var(--accent-danger);"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Refuel Modal -->
+        <div id="refuel-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" data-i18n="log_refuel_title">Log Refuel</h3>
+                    <button onclick="window.closeModal('refuel-modal')" class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group">
+                        <label class="input-label" data-i18n="current_km">Current KM (Odometer)</label>
+                        <input type="number" id="refuel-km-input" class="input-field" placeholder="e.g., 45150">
+                    </div>
+                    <div style="background: rgba(0, 200, 83, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid var(--accent-success); margin-bottom: 1rem;">
+                        <p style="font-size: 0.85rem; color: var(--accent-success); margin: 0;"><i class="fas fa-info-circle"></i> This records a Full Tank fill-up at this exact kilometer reading. This data syncs securely even if you are offline.</p>
+                    </div>
+                    <button onclick="window.confirmRefuel()" class="btn btn-success" style="width: 100%;">
+                        <i class="fas fa-gas-pump"></i> <span data-i18n="save_refuel">Save Refuel</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Modal for Security Flags -->
+        <div id="alert-modal" class="modal-overlay hidden" style="z-index: 9999;">
+            <div class="modal-content" style="text-align: center; max-width: 350px;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: var(--accent-danger); margin-bottom: 1rem;"></i>
+                <h3 class="modal-title" style="color: var(--accent-danger); margin-bottom: 1rem; border: none; padding: 0;">Error</h3>
+                <p id="alert-modal-message" style="margin-bottom: 2rem; color: var(--text-primary);"></p>
+                <button onclick="window.closeModal('alert-modal')" class="btn btn-primary" style="width: 100%; background: var(--accent-danger); border-color: var(--accent-danger);" data-i18n="err_ok">OK</button>
+            </div>
+        </div>
+
+        <!-- Vehicle Modal -->
+        <div id="vehicle-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="vehicle-modal-title">Manage Vehicle</h3>
+                    <button onclick="window.closeModal('vehicle-modal')" class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="vehicle-id-input">
+                    <div class="input-group">
+                        <label class="input-label">Make & Model</label>
+                        <input type="text" id="vehicle-make-input" class="input-field" placeholder="e.g., Toyota Camry">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Assigned Driver (Primary)</label>
+                        <select id="vehicle-assigned-driver-select" class="input-field">
+                            <option value="">-- None --</option>
+                        </select>
+                        <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.5rem;">Unlogged gaps &ge; 5 KM will be auto-calculated for this driver.</p>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">License Plate</label>
+                        <input type="text" id="vehicle-plate-input" class="input-field" placeholder="e.g., DXB 12345">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Last Service KM</label>
+                        <input type="number" id="vehicle-last-service-input" class="input-field" placeholder="e.g., 40000">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Service Interval KM (Default: 10000)</label>
+                        <input type="number" id="vehicle-service-interval-input" class="input-field" placeholder="e.g., 10000">
+                    </div>
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                        <button onclick="window.saveVehicle()" class="btn btn-primary" style="flex: 1;"><i class="fas fa-save"></i> Save</button>
+                        <button onclick="window.deleteVehicle()" id="btn-delete-vehicle" class="btn btn-outline" style="flex: 1; color: var(--accent-danger); border-color: var(--accent-danger);"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Trip Modal -->
+        <div id="edit-trip-modal" class="modal-overlay hidden" style="z-index: 1000;">
+            <div class="modal-content" style="max-width: 580px; width: 95%;">
+                <div class="modal-header">
+                    <h3 class="modal-title"><i class="fas fa-edit" style="color: var(--accent-primary); margin-right: 0.5rem;"></i>Edit Trip Log</h3>
+                    <button onclick="window.closeModal('edit-trip-modal')" class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit-trip-id">
+
+                    <!-- Date & Time Row -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0;">
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label class="input-label"><i class="fas fa-play-circle" style="color: var(--accent-success); margin-right: 0.35rem;"></i>Start Time</label>
+                            <input type="datetime-local" id="edit-trip-start-time" class="input-field" style="min-width: 0; width: 100%;">
+                        </div>
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label class="input-label"><i class="fas fa-stop-circle" style="color: var(--accent-danger); margin-right: 0.35rem;"></i>End Time</label>
+                            <input type="datetime-local" id="edit-trip-end-time" class="input-field" style="min-width: 0; width: 100%;">
+                        </div>
+                    </div>
+
+                    <!-- KM Row -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0; margin-top: 1rem;">
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label class="input-label"><i class="fas fa-tachometer-alt" style="color: var(--accent-primary); margin-right: 0.35rem;"></i>Start KM</label>
+                            <input type="number" id="edit-trip-start-km" class="input-field" placeholder="e.g. 45120">
+                        </div>
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label class="input-label"><i class="fas fa-tachometer-alt" style="color: var(--accent-warning); margin-right: 0.35rem;"></i>End KM</label>
+                            <input type="number" id="edit-trip-end-km" class="input-field" placeholder="e.g. 45300">
+                        </div>
+                    </div>
+
+                    <!-- Driver Row -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0; margin-top: 1rem;">
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label class="input-label"><i class="fas fa-user" style="color: var(--accent-primary); margin-right: 0.35rem;"></i>Driver</label>
+                            <select id="edit-trip-driver" class="input-field">
+                                <option value="">-- Select Driver --</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label class="input-label"><i class="fas fa-car" style="color: var(--accent-primary); margin-right: 0.35rem;"></i>Vehicle</label>
+                            <select id="edit-trip-vehicle" class="input-field">
+                                <option value="">-- Select Vehicle --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="input-group" style="margin-top: 1rem;">
+                        <label class="input-label"><i class="fas fa-sticky-note" style="margin-right: 0.35rem;"></i>Notes / Purpose</label>
+                        <input type="text" id="edit-trip-notes" class="input-field" placeholder="e.g. Site visit, delivery...">
+                    </div>
+
+                    <button onclick="window.saveTripEdit()" class="btn btn-primary" style="width: 100%; margin-top: 1.25rem; padding: 0.9rem; font-size: 1rem;">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Ready Modal -->
+    <div id="ready-modal" class="modal-overlay hidden">
+        <div class="modal-backdrop" onclick="window.closeModal('ready-modal')"></div>
+        <div class="modal-container" style="max-width: 400px; width: 90%;">
+            <div class="modal-content" style="text-align: center; padding: 2rem 1.5rem;">
+                <div style="font-size: 3rem; color: var(--accent-primary); margin-bottom: 1rem;">
+                    <i class="fas fa-question-circle"></i>
+                </div>
+                <h3 id="ready-modal-title" style="font-size: 1.5rem; margin-bottom: 1rem; color: var(--text-primary);">Are you ready for the trip?</h3>
+                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                    <button id="ready-modal-cancel" onclick="window.confirmReady(false)" class="btn btn-outline" style="flex: 1; padding: 1rem; font-size: 1.1rem; color: var(--text-secondary);">No, cancel</button>
+                    <button id="ready-modal-confirm" onclick="window.confirmReady(true)" class="btn btn-primary" style="flex: 1; padding: 1rem; font-size: 1.1rem;">Yes, I'm ready</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Map Modal -->
+    <div id="map-modal" class="modal-overlay hidden">
+        <div class="modal-backdrop" onclick="window.closeModal('map-modal')"></div>
+        <div class="modal-container" style="max-width: 800px; width: 95%;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title"><i class="fas fa-map-marked-alt text-primary"></i> Trip Route Map</h3>
+                    <button onclick="window.closeModal('map-modal')" class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body" style="padding: 0;">
+                    <div id="map-container" style="height: 500px; width: 100%; background: #e5e7eb; z-index: 1;"></div>
+                    <div style="padding: 1.5rem; background: var(--bg-card); display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                            <i class="fas fa-circle" style="color: var(--accent-success); font-size: 0.8rem; margin-top: 0.25rem;"></i>
+                            <div>
+                                <strong style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase;">Start Location</strong><br>
+                                <span id="map-start-text" style="font-weight: 500;">Loading...</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                            <i class="fas fa-circle" style="color: var(--accent-danger); font-size: 0.8rem; margin-top: 0.25rem;"></i>
+                            <div>
+                                <strong style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase;">End Location</strong><br>
+                                <span id="map-end-text" style="font-weight: 500;">Loading...</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--border-light); font-weight: bold; color: var(--accent-primary); font-size: 1.2rem;">
+                            <i class="fas fa-route"></i> Total Distance: <span id="map-distance-text">Calculating...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>    
+
+    <!-- Full Screen Animation Overlay -->
+    <div id="animation-overlay" class="anim-overlay hidden">
+        <div id="anim-icon-container" class="anim-icon-box">
+            <i id="anim-icon" class="fas fa-car-side"></i>
+        </div>
+        <h2 id="anim-text" class="anim-text">Trip Started!</h2>
+    </div>
+
+    <!-- Toasts Container -->
+    <div id="toasts-container" class="toasts-container"></div>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(() => console.log('Service Worker: Registered'))
+                    .catch(e => console.error('Service Worker: Error', e));
+            });
+        }
+    </script>
+    
+    <!-- Main Application Logic (Native ES Modules) -->
+    <script type="module" src="./src/main.js?v=35"></script>
+</body>
+</html>
