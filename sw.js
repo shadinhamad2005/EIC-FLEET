@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fleet-tracker-v21';
+const CACHE_NAME = 'fleet-tracker-v99';
 
 // ONLY cache truly static external assets (fonts, icons) — NEVER JS or CSS
 const STATIC_ASSETS = [

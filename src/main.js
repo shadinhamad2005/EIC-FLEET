@@ -1,7 +1,7 @@
-import { app, auth, db, getCol, getDocRef, signInAnonymously, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, setDoc } from './firebase/config.js?v=27';
-import { state, updateState, loadedFlags, subscribe } from './state.js?v=27';
-import { renderApp } from './ui/views.js?v=27';
-import { t, setLang } from './i18n.js?v=27';
+import { app, auth, db, getCol, getDocRef, signInAnonymously, onSnapshot, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, setDoc } from './firebase/config.js';
+import { state, updateState, loadedFlags, subscribe } from './state.js';
+import { renderApp } from './ui/views.js';
+import { t, setLang } from './i18n.js';
 
 // Subscribe to state changes to trigger UI re-renders
 subscribe(renderApp);
@@ -139,6 +139,26 @@ function checkLoaded() {
     if (loadedFlags.drivers && loadedFlags.admins && loadedFlags.vehicles && loadedFlags.logs && loadedFlags.refuels && loadedFlags.broadcasts) {
         if (state.isLoading) {
             updateState({ isLoading: false });
+            
+            // Auto-Close orphaned trips older than 24 hours
+            const now = new Date();
+            state.logs.forEach(l => {
+                if (l.endingKm == null && l.startTime) {
+                    const diffHours = (now - new Date(l.startTime)) / (1000 * 60 * 60);
+                    if (diffHours > 24) {
+                        try {
+                            updateDoc(getDocRef('logs', l.id), {
+                                endingKm: l.startingKm, // Nullify distance driven
+                                endTime: now.toISOString(),
+                                status: 'Closed',
+                                notes: 'Auto-closed by system (Timeout > 24h)'
+                            });
+                            updateDoc(getDocRef('vehicles', l.vehicleId), { status: 'Available' });
+                        } catch (e) { console.error('Error auto-closing orphaned trip', e); }
+                    }
+                }
+            });
+            
             // Auto bypass logic if already logged in via cache
             const cachedDriverId = localStorage.getItem('eic_current_driver');
             if (cachedDriverId) {
@@ -256,10 +276,16 @@ function setupRealtimeListeners() {
 }
 
 // Global actions
-window.handleLogin = function(role, id = null) {
+window.handleLogin = async function(role, id = null) {
     if (role === 'admin') {
         const pin = document.getElementById('admin-pin-input').value;
-        if (pin === '8891190911') {
+        
+        // Hash check for super admin
+        const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        if (hashHex === 'f04ed3aab563aa7cb386da5ae5dce216bbd1520c76210e62cb56264c6513ab7b') {
             updateState({ view: 'admin', adminRole: 'super' });
             showToast('Admin Access Granted');
         } else {
@@ -273,11 +299,11 @@ window.handleLogin = function(role, id = null) {
         }
     } else if (role === 'driver') {
         const driverId = document.getElementById('driver-select').value;
-        const pin = document.getElementById('driver-pin-input').value;
+        const pin = document.getElementById('login-driver-pin-input').value;
         const driver = state.drivers.find(d => d.id === driverId);
         
         if (!driver) return showToast('Select a driver', 'warning');
-        if (driver.pin !== pin) return showToast('Invalid PIN', 'error');
+        if (driver.pin !== pin.trim()) return showToast('Invalid PIN', 'error');
         
         localStorage.setItem('eic_current_driver', driver.id);
         
@@ -369,34 +395,6 @@ window.confirmReady = async function(isReady) {
         closeModal('ready-modal');
         window._tempLocationCoords = null; // No location grabbed
     } else {
-        const confirmBtn = document.getElementById('ready-modal-confirm');
-        const cancelBtn = document.getElementById('ready-modal-cancel');
-        const originalText = confirmBtn.textContent;
-        
-        // Show loading state on the button
-        confirmBtn.disabled = true;
-        cancelBtn.disabled = true;
-        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Acquiring GPS...';
-        
-        // Try to get location. Will prompt if first time.
-        window._tempLocationCoords = await new Promise((resolve) => {
-            if (!navigator.geolocation) return resolve(null);
-            navigator.geolocation.getCurrentPosition(
-                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => {
-                    if (err.code === err.PERMISSION_DENIED) {
-                        showToast('Location denied. Please allow it in settings next time.', 'warning');
-                    }
-                    resolve(null);
-                },
-                { timeout: 30000, enableHighAccuracy: true } // 30 seconds to allow time to click the native prompt
-            );
-        });
-        
-        // Restore button state and close modal
-        confirmBtn.disabled = false;
-        cancelBtn.disabled = false;
-        confirmBtn.textContent = originalText;
         closeModal('ready-modal');
     }
     
@@ -407,6 +405,12 @@ window.confirmReady = async function(isReady) {
         } else {
             window.openStopModal();
         }
+    }
+};
+
+window.confirmTakeOver = function(vid, driverName) {
+    if (confirm(`Are you sure? ${driverName} has not closed their trip.`)) {
+        window.openReadyModal('start', vid);
     }
 };
 
@@ -484,6 +488,10 @@ window.confirmStartDriving = async function() {
     if (startKm < lastKm) {
         return flagInputError('start-km-input', `${t('err_start_less')} (${lastKm} KM)`);
     }
+    
+    if (lastKm > 0 && startKm > lastKm + 5000) {
+        return flagInputError('start-km-input', 'Starting KM is suspiciously high! Please check again or contact Admin.');
+    }
 
     closeModal('start-modal');
     
@@ -491,7 +499,7 @@ window.confirmStartDriving = async function() {
     const animPromise = showAnimation('start');
     
     // Use the location we grabbed in the Ready Modal (if any)
-    let locationCoords = window._tempLocationCoords || null;
+
     window._tempLocationCoords = null; // Clear it so it's not reused accidentally
     
     const firebasePromise = (async () => {
@@ -538,7 +546,7 @@ window.confirmStartDriving = async function() {
             driverId: state.currentUser.id,
             startTime: new Date().toISOString(),
             startingKm: startKm,
-            startLocation: locationCoords,
+
             endingKm: null,
             purpose: purpose,
             notes: '',
@@ -578,9 +586,12 @@ window.confirmStopDriving = async function() {
     const activeLog = state.logs.find(l => l.vehicleId === vehicle.id && l.driverId === driver.id && l.endingKm == null);
     if (!activeLog) return showToast('No active trip found to stop', 'error');
 
-    // Security Check: Odometer must be >= starting KM
-    if (endingKm < activeLog.startingKm) {
-        return flagInputError('ending-km-input', `${t('err_end_less')} (${activeLog.startingKm} KM)`);
+    // Security Check: Odometer must be > starting KM
+    if (endingKm <= activeLog.startingKm) {
+        return flagInputError('ending-km-input', `Ending KM must be greater than Starting KM (${activeLog.startingKm})`);
+    }
+    if (endingKm > activeLog.startingKm + 5000) {
+        return flagInputError('ending-km-input', 'Ending KM is suspiciously high! Please check again or contact Admin.');
     }
 
     closeModal('stop-modal');
@@ -588,14 +599,14 @@ window.confirmStopDriving = async function() {
     const animPromise = showAnimation('stop');
     
     // Use the location we grabbed in the Ready Modal (if any)
-    let locationCoords = window._tempLocationCoords || null;
+
     window._tempLocationCoords = null;
     
     const firebasePromise = (async () => {
         await updateDoc(getDocRef('logs', activeLog.id), {
             endingKm: endingKm,
             endTime: new Date().toISOString(),
-            endLocation: locationCoords,
+
             notes: notes,
             status: 'Closed'
         });
@@ -632,10 +643,13 @@ window.confirmRefuel = async function() {
 
     closeModal('refuel-modal');
     
+    const activeLog = state.logs.find(l => l.vehicleId === vehicle.id && l.driverId === driver.id && l.endingKm == null);
+    
     // Optimistic offline write
     addDoc(getCol('refuels'), {
         vehicleId: vehicle.id,
         driverId: driver.id,
+        tripId: activeLog ? activeLog.id : null,
         odometer: currentKm,
         timestamp: new Date().toISOString(),
         isFullTank: true
@@ -1028,144 +1042,7 @@ window.deleteTrip = async function(logId) {
     showToast('Trip deleted successfully');
 };
 
-let fleetMap = null;
 
-// ✅ MAPBOX ACCESS TOKEN — Replace with your own from https://account.mapbox.com
-const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2hhbmlkOTExIiwiYSI6ImNtcTduYjJucTAxY3MycXNkMm93bXhwZ3cifQ.pvCFIRDr4EfkBQ8Q0QrluA';
 
-window.openMapModal = async function(tripId) {
-    const log = state.logs.find(l => l.id === tripId);
-    if (!log) { showToast('Trip not found', 'error'); return; }
-
-    document.getElementById('map-start-text').innerText = 'Locating...';
-    document.getElementById('map-end-text').innerText = 'Trip in progress...';
-    document.getElementById('map-distance-text').innerText = '—';
-
-    openModal('map-modal');
-
-    // Destroy previous map completely
-    if (fleetMap) { fleetMap.remove(); fleetMap = null; }
-    document.getElementById('map-container').innerHTML = '';
-
-    await new Promise(r => setTimeout(r, 400));
-
-    const start = log.startLocation;
-    const end   = log.endLocation;
-
-    // Reverse geocode using Mapbox
-    const getPlaceName = async (lat, lng) => {
-        try {
-            const res = await fetch(
-                `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&types=poi,address,neighborhood,place&limit=1`
-            );
-            const data = await res.json();
-            return data.features?.[0]?.place_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-        } catch(e) {
-            return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-        }
-    };
-
-    if (!start && !end) {
-        document.getElementById('map-start-text').innerText = 'No GPS data — Geotagging was OFF for this trip';
-        document.getElementById('map-end-text').innerText = 'Go to Admin → Settings → enable GPS Geotagging';
-        document.getElementById('map-distance-text').innerText = 'N/A';
-
-        fleetMap = new mapboxgl.Map({
-            container: 'map-container',
-            style: 'mapbox://styles/mapbox/dark-v11',
-            center: [55.2708, 25.2048],
-            zoom: 8,
-            accessToken: MAPBOX_TOKEN
-        });
-        return;
-    }
-
-    const center = start ? [start.lng, start.lat] : [end.lng, end.lat];
-
-    fleetMap = new mapboxgl.Map({
-        container: 'map-container',
-        style: 'mapbox://styles/mapbox/streets-v12',
-        center: center,
-        zoom: 14,
-        accessToken: MAPBOX_TOKEN
-    });
-
-    fleetMap.on('load', async () => {
-
-        // --- Start Marker ---
-        if (start) {
-            const el = document.createElement('div');
-            el.style.cssText = 'width:20px;height:20px;border-radius:50%;background:#22c55e;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);cursor:pointer;';
-            new mapboxgl.Marker({ element: el })
-                .setLngLat([start.lng, start.lat])
-                .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML('<strong>🟢 Trip Started</strong>'))
-                .addTo(fleetMap)
-                .togglePopup();
-            getPlaceName(start.lat, start.lng).then(name => {
-                document.getElementById('map-start-text').innerText = name;
-            });
-        } else {
-            document.getElementById('map-start-text').innerText = 'No start GPS recorded';
-        }
-
-        // --- End Marker ---
-        if (end) {
-            const el = document.createElement('div');
-            el.style.cssText = 'width:20px;height:20px;border-radius:50%;background:#ef4444;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);cursor:pointer;';
-            new mapboxgl.Marker({ element: el })
-                .setLngLat([end.lng, end.lat])
-                .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML('<strong>🔴 Trip Ended</strong>'))
-                .addTo(fleetMap);
-            getPlaceName(end.lat, end.lng).then(name => {
-                document.getElementById('map-end-text').innerText = name;
-            });
-        } else {
-            document.getElementById('map-end-text').innerText = '⏳ Trip in progress — end location pending';
-        }
-
-        // --- Draw Route if both points exist ---
-        if (start && end) {
-            try {
-                const routeRes = await fetch(
-                    `https://api.mapbox.com/directions/v5/mapbox/driving/${start.lng},${start.lat};${end.lng},${end.lat}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`
-                );
-                const routeData = await routeRes.json();
-                if (routeData.routes && routeData.routes.length > 0) {
-                    const route = routeData.routes[0];
-                    const distKm = (route.distance / 1000).toFixed(2);
-                    const durationMin = Math.round(route.duration / 60);
-                    document.getElementById('map-distance-text').innerText = `${distKm} KM  (≈ ${durationMin} min drive)`;
-
-                    fleetMap.addSource('route', {
-                        type: 'geojson',
-                        data: { type: 'Feature', properties: {}, geometry: route.geometry }
-                    });
-                    fleetMap.addLayer({
-                        id: 'route',
-                        type: 'line',
-                        source: 'route',
-                        layout: { 'line-join': 'round', 'line-cap': 'round' },
-                        paint: { 'line-color': '#3b82f6', 'line-width': 6, 'line-opacity': 0.9 }
-                    });
-
-                    // Fit map to show full route
-                    const coords = route.geometry.coordinates;
-                    const bounds = coords.reduce((b, c) => b.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
-                    fleetMap.fitBounds(bounds, { padding: 60 });
-                } else {
-                    document.getElementById('map-distance-text').innerText = 'Route not available';
-                    fleetMap.fitBounds([[start.lng, start.lat], [end.lng, end.lat]], { padding: 80 });
-                }
-            } catch(e) {
-                document.getElementById('map-distance-text').innerText = 'Could not load route';
-            }
-        } else if (start) {
-            document.getElementById('map-distance-text').innerText = 'Trip in progress — no end point yet';
-        }
-    });
-};
-
-document.addEventListener("DOMContentLoaded", () => {
-    init();
-});
-
+// Start application
+init();

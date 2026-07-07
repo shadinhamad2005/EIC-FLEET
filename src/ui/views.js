@@ -1,5 +1,5 @@
-import { state } from '../state.js?v=27';
-import { t } from '../i18n.js?v=27';
+import { state } from '../state.js';
+import { t } from '../i18n.js';
 
 function getLangSwitcher() {
     const lang = localStorage.getItem('eic_lang') || 'en';
@@ -81,7 +81,7 @@ function renderLogin() {
                 
                 <div class="input-group" style="text-align: left;">
                     <label class="input-label">${t('pin_code')}</label>
-                    <input type="password" id="driver-pin-input" class="input-field" placeholder="••••" maxlength="4" style="text-align: center; font-size: 1.5rem; letter-spacing: 0.5em;">
+                    <input type="password" inputmode="numeric" pattern="[0-9]*" id="login-driver-pin-input" class="input-field" placeholder="••••" maxlength="4" style="text-align: center; font-size: 1.5rem; letter-spacing: 0.5em;">
                 </div>
                 
                 <button onclick="window.handleLogin('driver')" class="btn btn-primary" style="margin-top: 1rem;">
@@ -98,7 +98,7 @@ function renderLogin() {
             <div id="admin-login-form" class="hidden" style="margin-top: 1rem; text-align: left;">
                 <div class="input-group">
                     <label class="input-label">Admin PIN</label>
-                    <input type="password" id="admin-pin-input" class="input-field" placeholder="Admin PIN">
+                    <input type="password" inputmode="numeric" pattern="[0-9]*" id="admin-pin-input" class="input-field" placeholder="Admin PIN">
                 </div>
                 <button onclick="window.handleLogin('admin')" class="btn btn-outline">Access Dashboard</button>
             </div>
@@ -129,13 +129,16 @@ function renderVehicles() {
     state.vehicles.forEach(v => {
         const activeLog = state.logs.find(l => l.vehicleId === v.id && l.endingKm == null);
         const isTaken = !!activeLog;
+        const activeDriverName = isTaken ? (state.drivers.find(d => d.id === activeLog.driverId)?.name || 'Unknown') : null;
         
         let statusBadge = isTaken 
-            ? `<span class="badge badge-warning">${t('taken_by')} ${state.drivers.find(d => d.id === activeLog.driverId)?.name || 'Unknown'}</span>`
+            ? `<span class="badge badge-warning">${t('taken_by')} ${activeDriverName}</span>`
             : `<span class="badge badge-success">${t('available')}</span>`;
 
+        let onClickAction = isTaken ? `window.confirmTakeOver('${v.id}', '${activeDriverName.replace(/'/g, "\\'")}')` : `window.openReadyModal('start', '${v.id}')`;
+
         html += `
-            <div class="card" onclick="window.openReadyModal('start', '${v.id}')" ${isTaken ? 'style="border: 1px solid var(--accent-warning);"' : ''}>
+            <div class="card" onclick="${onClickAction}" ${isTaken ? 'style="border: 1px solid var(--accent-warning);"' : ''}>
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
                     <div>
                         <h3 style="font-size: 1.25rem; margin-bottom: 0.25rem;">${v.makeModel}</h3>
@@ -217,8 +220,7 @@ function renderAdmin() {
                 endStr = endObj.toLocaleDateString() + ' <span class="text-muted" style="font-size:0.85em">' + endObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + '</span>';
             }
             
-            const hasLocation = l.startLocation || l.endLocation;
-            let startLocationHtml = (hasLocation) ? ` <button onclick="window.openMapModal('${l.id}')" title="View Route on Map" style="background:none;border:none;cursor:pointer;color: var(--accent-primary); margin-left: 0.25rem; font-size: 1rem; vertical-align: middle;"><i class="fas fa-map-marked-alt"></i></button>` : '';
+            let startLocationHtml = '';
             let endLocationHtml = '';
             
             return `
