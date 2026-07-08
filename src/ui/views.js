@@ -205,7 +205,11 @@ function renderAdmin() {
                 return logTime >= filterStart && logTime <= filterEnd;
             });
         }
-        const sortedLogs = filteredLogs.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+        const sortedLogs = filteredLogs.sort((a, b) => {
+            const timeA = new Date(a.startTime || a.timestamp || 0).getTime();
+            const timeB = new Date(b.startTime || b.timestamp || 0).getTime();
+            return timeB - timeA;
+        });
         
         const rows = sortedLogs.map(l => {
             const v = state.vehicles.find(v => v.id === l.vehicleId);
@@ -231,15 +235,18 @@ function renderAdmin() {
                     </td>
                     <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light);"><strong>${v?.makeModel || 'Unknown'}</strong><br><span class="text-muted" style="font-size:0.8em">${v?.plate || ''}</span></td>
                     <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light);">${d?.name || 'Unknown'}</td>
-                    <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light); white-space: nowrap;">${l.startingKm} - ${l.endingKm || 'Active'}</td>
+                    <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light); white-space: nowrap;">
+                        <div style="font-weight: 500;">${l.startingKm} - ${l.endingKm != null && l.endingKm !== '' ? l.endingKm : 'Active'}</div>
+                        ${l.endingKm != null && l.endingKm !== '' && Number(l.endingKm) >= Number(l.startingKm) ? `<div class="text-muted" style="font-size: 0.8em; margin-top: 0.2rem; color: #3b82f6;"><i class="fas fa-route"></i> ${Number(l.endingKm) - Number(l.startingKm)} KM Driven</div>` : ''}
+                    </td>
                     <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light);">
-                        ${(l.status === 'Open' || !l.endingKm) 
+                        ${(l.status === 'Open' || l.endingKm == null || l.endingKm === '') 
                             ? `<div style="display: flex; align-items: center; gap: 0.5rem;"><span class="badge badge-warning" style="white-space: nowrap;">Active</span><button onclick="window.adminForceCloseTrip('${l.id}', '${v?.id}')" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; color: var(--accent-danger); border-color: var(--accent-danger); width: auto; white-space: nowrap;">Force Close</button></div>` 
                             : '<span class="badge badge-success">Closed</span>'}
                     </td>
                     <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border-light); white-space: nowrap;" class="no-print">
                         <button class="btn btn-outline" style="padding: 0; width: 32px; height: 32px; font-size: 0.8rem; margin-right: 0.5rem; display: inline-flex; justify-content: center; align-items: center;" onclick="window.openEditTripModal('${l.id}')" title="Edit Trip"><i class="fas fa-edit"></i></button>
-                        ${(l.status === 'Open' || !l.endingKm)
+                        ${(l.status === 'Open' || l.endingKm == null || l.endingKm === '')
                             ? `<button class="btn btn-outline" style="padding:0;width:32px;height:32px;font-size:0.8rem;opacity:0.4;cursor:not-allowed;display:inline-flex;justify-content:center;align-items:center;" disabled title="Cannot delete active trip"><i class="fas fa-trash"></i></button>`
                             : `<button class="btn btn-outline" style="padding:0;width:32px;height:32px;font-size:0.8rem;color:var(--accent-danger);border-color:var(--accent-danger);display:inline-flex;justify-content:center;align-items:center;" onclick="window.deleteTrip('${l.id}')" title="Delete Trip"><i class="fas fa-trash"></i></button>`
                         }
@@ -397,23 +404,6 @@ function renderAdmin() {
                 </table>
             </div>
         `;
-    } else if (state.adminTab === 'settings') {
-        tabContent = `
-            <div style="padding: 2rem;">
-                <h3 style="margin-bottom: 1.5rem; color: var(--text-primary); border-bottom: 1px solid var(--border-light); padding-bottom: 0.5rem;">Global Settings</h3>
-                
-                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-light); margin-bottom: 1.5rem;">
-                    <div>
-                        <h4 style="margin: 0 0 0.5rem 0; font-size: 1.1rem;"><i class="fas fa-map-marker-alt" style="color: var(--accent-primary); margin-right: 0.5rem;"></i> GPS Geotagging</h4>
-                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Automatically request and capture driver coordinates when starting or ending a trip. Requires PWA or browser permissions.</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="geotag-toggle" ${state.settings?.enableGeotagging ? 'checked' : ''} onchange="window.toggleSetting('enableGeotagging', this.checked)">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-        `;
     }
 
     container.innerHTML = `
@@ -433,10 +423,9 @@ function renderAdmin() {
         
         <div class="glass-panel" style="padding: 0; overflow: hidden;">
             <div style="display: flex; border-bottom: 1px solid var(--border-light); background: rgba(0,0,0,0.1);">
-                <button class="btn ${state.adminTab === 'logbook' ? 'btn-primary' : 'btn-outline'}" style="width: 25%; border-radius: 0; border: none; border-right: 1px solid var(--border-light);" onclick="window.switchAdminTab('logbook')">Logbook</button>
-                <button class="btn ${state.adminTab === 'vehicles' ? 'btn-primary' : 'btn-outline'}" style="width: 25%; border-radius: 0; border: none; border-right: 1px solid var(--border-light);" onclick="window.switchAdminTab('vehicles')">Vehicles</button>
-                <button class="btn ${state.adminTab === 'drivers' ? 'btn-primary' : 'btn-outline'}" style="width: 25%; border-radius: 0; border: none; border-right: 1px solid var(--border-light);" onclick="window.switchAdminTab('drivers')">Drivers</button>
-                <button class="btn ${state.adminTab === 'settings' ? 'btn-primary' : 'btn-outline'}" style="width: 25%; border-radius: 0; border: none;" onclick="window.switchAdminTab('settings')">Settings</button>
+                <button class="btn ${state.adminTab === 'logbook' ? 'btn-primary' : 'btn-outline'}" style="width: 33.33%; border-radius: 0; border: none; border-right: 1px solid var(--border-light);" onclick="window.switchAdminTab('logbook')">Logbook</button>
+                <button class="btn ${state.adminTab === 'vehicles' ? 'btn-primary' : 'btn-outline'}" style="width: 33.33%; border-radius: 0; border: none; border-right: 1px solid var(--border-light);" onclick="window.switchAdminTab('vehicles')">Vehicles</button>
+                <button class="btn ${state.adminTab === 'drivers' ? 'btn-primary' : 'btn-outline'}" style="width: 33.33%; border-radius: 0; border: none;" onclick="window.switchAdminTab('drivers')">Drivers</button>
             </div>
             <div style="padding: 0;">
                 ${tabContent}

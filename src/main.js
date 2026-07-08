@@ -520,7 +520,7 @@ window.confirmStartDriving = async function() {
             // GHOST GAP AUTO-LOGGING for Assigned Primary Drivers
             // Only trigger if there is no active log currently overriding this gap.
             const gap = startKm - lastKm;
-            if (gap >= 5 && vehicle.assignedDriverId) {
+            if (gap >= 5 && vehicle.assignedDriverId && lastKm > 0) {
                 try {
                     await addDoc(getCol('logs'), {
                         vehicleId: vehicle.id,
